@@ -1,0 +1,6 @@
+<resources>
+    <!-- Tema base sin ActionBar; todo el UI se dibuja con Jetpack Compose. -->
+    <style name="Theme.MusicPlayer" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@android:color/white</item>
+    </style>
+</resources>

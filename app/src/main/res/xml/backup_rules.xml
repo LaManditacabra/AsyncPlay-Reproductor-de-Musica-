@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Los archivos descargados y la BD se regeneran; no hace falta respaldarlos. -->
+    <exclude domain="database" path="music_player.db" />
+    <exclude domain="file" path="music/" />
+    <exclude domain="file" path="artwork/" />
+</full-backup-content>

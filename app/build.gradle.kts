@@ -40,12 +40,12 @@ android {
         if (hasReleaseSigning) {
             create("release") {
                 if (useEnvSigning) {
-                    storeFile = file("keystore/release.keystore")
+                    storeFile = rootProject.file("keystore/release.keystore")
                     storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
                     keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: "release"
                     keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
                 } else {
-                    storeFile = file(keystoreProps.getProperty("keystoreFile"))
+                    storeFile = rootProject.file(keystoreProps.getProperty("keystoreFile"))
                     storePassword = keystoreProps.getProperty("storePassword")
                     keyAlias = keystoreProps.getProperty("keyAlias")
                     keyPassword = keystoreProps.getProperty("keyPassword")

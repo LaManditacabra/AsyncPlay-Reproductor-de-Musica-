@@ -42,12 +42,13 @@ object FileDownloader {
 
     /**
      * Igual que [download] pero reporta el progreso (0-100) a través de
-     * [onProgress]. Si el servidor no indica el tamaño total, no se notifica.
+     * [onProgress] (callback suspendible para poder notificar desde corutinas).
+     * Si el servidor no indica el tamaño total, no se notifica.
      */
-    fun downloadWithProgress(
+    suspend fun downloadWithProgress(
         url: String,
         destination: File,
-        onProgress: (Int) -> Unit,
+        onProgress: suspend (Int) -> Unit,
     ) {
         val connection = URL(url).openConnection() as HttpURLConnection
         try {

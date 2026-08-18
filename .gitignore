@@ -4,6 +4,11 @@
 /.idea
 .DS_Store
 /build
+/app/build
+/.artifacts
 /captures
 .externalNativeBuild
 .cxx
+# Credenciales de firma (no subir al repo)
+/keystore.properties
+/keystore/

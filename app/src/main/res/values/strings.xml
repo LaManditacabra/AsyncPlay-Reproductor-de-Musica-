@@ -43,6 +43,19 @@
     <string name="search_error">No se pudo realizar la búsqueda.</string>
     <string name="search_download_queued">Descarga iniciada</string>
 
+    <!-- Importar música local -->
+    <string name="import_songs">Importar música</string>
+    <string name="import_success">Importadas %1$d canción(es)</string>
+    <string name="import_failed">No se pudo importar la música</string>
+    <string name="local_artist">Archivo local</string>
+
+    <!-- Descargas -->
+    <string name="download_added">Canción añadida: %1$s</string>
+    <string name="download_failed">Error al descargar: %1$s</string>
+    <string name="download_pending_title">Descarga en curso</string>
+    <string name="download_status_extracting">Extrayendo información…</string>
+    <string name="download_status_downloading">Descargando…</string>
+
     <!-- Actualizaciones -->
     <string name="update_available_title">Nueva versión disponible</string>
     <string name="update_version_label">Versión %1$s</string>

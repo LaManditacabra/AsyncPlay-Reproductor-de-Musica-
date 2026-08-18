@@ -1,5 +1,7 @@
 package com.example.musicplayer.ui.songs
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,19 +17,25 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,14 +44,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.musicplayer.R
 import com.example.musicplayer.data.model.Song
+import com.example.musicplayer.scraper.DownloadWorker
 import com.example.musicplayer.ui.components.MiniPlayerBar
 import com.example.musicplayer.ui.components.SongCard
 import com.example.musicplayer.ui.player.PlayerScreen
+import com.example.musicplayer.ui.songs.SongsViewModel.ActiveDownload
 import com.example.musicplayer.ui.update.UpdateDialog
 import com.example.musicplayer.update.UpdateManager.UpdateState
 
@@ -62,9 +73,22 @@ fun SongsScreen(
     val favoritesOnly by viewModel.favoritesOnly.collectAsStateWithLifecycle()
     val playerState by viewModel.playerState.collectAsStateWithLifecycle()
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
+    val activeDownloads by viewModel.activeDownloads.collectAsStateWithLifecycle()
     var showAddDialog by remember { mutableStateOf(false) }
     var songToDelete by remember { mutableStateOf<Song?>(null) }
     var showPlayer by remember { mutableStateOf(false) }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments(),
+    ) { uris -> viewModel.importSongs(uris) }
+
+    // Muestra los mensajes de descargas/importaciones como snackbar.
+    LaunchedEffect(viewModel) {
+        viewModel.messages.collect { message ->
+            snackbarHostState.showSnackbar(message)
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -86,6 +110,15 @@ fun SongsScreen(
                                 },
                             )
                         }
+                        // Importar música local (SAF, sin permisos de almacenamiento).
+                        IconButton(onClick = {
+                            importLauncher.launch(arrayOf("audio/*"))
+                        }) {
+                            Icon(
+                                Icons.Filled.FolderOpen,
+                                contentDescription = stringResource(R.string.import_songs),
+                            )
+                        }
                         // Búsqueda en YouTube.
                         IconButton(onClick = onNavigateToSearch) {
                             Icon(
@@ -96,6 +129,7 @@ fun SongsScreen(
                     },
                 )
             },
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             floatingActionButton = {
                 FloatingActionButton(onClick = { showAddDialog = true }) {
                     Icon(
@@ -110,6 +144,20 @@ fun SongsScreen(
                     .fillMaxSize()
                     .padding(innerPadding),
             ) {
+                // Descargas en curso: señal de vida con estado y progreso.
+                if (activeDownloads.isNotEmpty()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        activeDownloads.forEach { download ->
+                            DownloadStatusCard(download = download)
+                        }
+                    }
+                }
+
                 if (songs.isEmpty()) {
                     // Estado vacío: no hay canciones aún.
                     EmptyState(
@@ -234,6 +282,42 @@ private fun EmptyState(modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
+    }
+}
+
+/** Tarjeta que muestra el estado y progreso de una descarga en curso. */
+@Composable
+private fun DownloadStatusCard(download: ActiveDownload) {
+    val statusText = when (download.status) {
+        DownloadWorker.STATUS_DOWNLOADING -> stringResource(R.string.download_status_downloading)
+        else -> stringResource(R.string.download_status_extracting)
+    }
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = download.title ?: stringResource(R.string.download_pending_title),
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = statusText,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            if (download.progress > 0) {
+                LinearProgressIndicator(
+                    progress = { download.progress / 100f },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+                // Progreso indeterminado: aún no se conoce el total.
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+        }
     }
 }
 

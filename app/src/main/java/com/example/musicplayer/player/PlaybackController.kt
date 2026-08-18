@@ -9,6 +9,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.example.musicplayer.data.model.Song
+import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -63,10 +64,6 @@ class PlaybackController(context: Context) : Player.Listener {
     /** Reproducción solicitada antes de que la conexión con el servicio estuviera lista. */
     private var pendingPlay: Pair<List<Song>, Int>? = null
 
-    init {
-        connect()
-    }
-
     // ------------------------------------------------------------------
     // Conexión con el servicio de reproducción
     // ------------------------------------------------------------------
@@ -75,45 +72,58 @@ class PlaybackController(context: Context) : Player.Listener {
         val sessionToken =
             SessionToken(appContext, ComponentName(appContext, PlayerService::class.java))
 
-        // buildAsync() conecta de forma asíncrona; onConnected() se invoca al listo.
-        MediaController.Builder(appContext, sessionToken)
-            .setListener(controllerListener)
-            .buildAsync()
+        // buildAsync() devuelve un futuro que se completa al conectarse.
+        // (Desde Media3 1.10 ya no existe el callback `onConnected` del listener.)
+        val controllerFuture =
+            MediaController.Builder(appContext, sessionToken)
+                .setListener(controllerListener)
+                .buildAsync()
+
+        controllerFuture.addListener(
+            {
+                try {
+                    onControllerConnected(controllerFuture.get())
+                } catch (e: Exception) {
+                    android.util.Log.e(TAG, "No se pudo conectar con el servicio", e)
+                }
+            },
+            MoreExecutors.directExecutor(),
+        )
     }
 
     private val controllerListener = object : MediaController.Listener {
-
-        override fun onConnected(controller: MediaController) {
-            mediaController = controller
-            controller.addListener(this@PlaybackController)
-            _state.update {
-                it.copy(
-                    isConnected = true,
-                    shuffleEnabled = controller.shuffleModeEnabled,
-                    repeatMode = controller.repeatMode,
-                )
-            }
-
-            // Ejecuta la reproducción pendiente (si se pidió antes de conectar).
-            pendingPlay?.let { (songs, index) ->
-                playAt(songs, index)
-                pendingPlay = null
-            }
-            handlePendingRestoreIfNeeded()
-            startTicker()
-        }
-
         override fun onDisconnected(controller: MediaController) {
             mediaController = null
             _state.update { it.copy(isConnected = false) }
             stopTicker()
         }
+    }
 
-        override fun onPlayerError(controller: MediaController, error: PlaybackException) {
-            // Archivo corrupto, formato no soportado, etc.
-            // En un caso real se notificaría al usuario; aquí simplemente se loguea.
-            android.util.Log.e(TAG, "Error de reproducción", error)
+    init {
+        // IMPORTANTE: debe ir después de declarar `controllerListener`, porque
+        // connect() lo usa y las propiedades se inicializan en orden.
+        connect()
+    }
+
+    /** Se invoca cuando la conexión con el servicio está lista. */
+    private fun onControllerConnected(controller: MediaController) {
+        mediaController = controller
+        controller.addListener(this@PlaybackController)
+        _state.update {
+            it.copy(
+                isConnected = true,
+                shuffleEnabled = controller.shuffleModeEnabled,
+                repeatMode = controller.repeatMode,
+            )
         }
+
+        // Ejecuta la reproducción pendiente (si se pidió antes de conectar).
+        pendingPlay?.let { (songs, index) ->
+            playAt(songs, index)
+            pendingPlay = null
+        }
+        handlePendingRestoreIfNeeded()
+        startTicker()
     }
 
     // ------------------------------------------------------------------
@@ -275,6 +285,12 @@ class PlaybackController(context: Context) : Player.Listener {
 
     override fun onPlaybackStateChanged(playbackState: Int) {
         _state.update { it.copy(isBuffering = playbackState == Player.STATE_BUFFERING) }
+    }
+
+    override fun onPlayerError(error: PlaybackException) {
+        // Archivo corrupto, formato no soportado, etc.
+        // En un caso real se notificaría al usuario; aquí simplemente se loguea.
+        android.util.Log.e(TAG, "Error de reproducción", error)
     }
 
     /** Al cambiar de canción (auto-next incluido) actualizamos la canción actual. */

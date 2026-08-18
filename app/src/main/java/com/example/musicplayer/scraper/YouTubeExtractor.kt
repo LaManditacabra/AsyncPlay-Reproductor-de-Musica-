@@ -47,7 +47,7 @@ class YouTubeExtractor {
             artist = info.uploaderName,
             durationSeconds = info.duration,
             audioUrl = checkNotNull(audio.content) { "El stream de audio no tiene URL" },
-            audioExtension = audio.format.suffix,
+            audioExtension = audio.format?.suffix ?: "m4a",
             thumbnailUrl = info.thumbnails.maxByOrNull { it.height }?.url,
         )
     }

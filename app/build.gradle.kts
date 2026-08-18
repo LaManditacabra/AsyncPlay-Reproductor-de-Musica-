@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,20 +7,51 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+// Credenciales de firma para el release. Se leen de `keystore.properties`
+// (local, gitignored) o de variables de entorno (GitHub Actions). Si no hay
+// ninguna, el release se genera sin firmar para no romper el build.
+val keystoreProps = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+val useEnvSigning = System.getenv("RELEASE_KEYSTORE_PASSWORD") != null
+val hasReleaseSigning = useEnvSigning || keystoreProps.containsKey("keystoreFile")
+
 android {
     namespace = "com.example.musicplayer"
-    compileSdk = 35
+    // Media3 1.10.1 exige compileSdk 36 (AGP 8.9+).
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.musicplayer"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
 
         // Configuración del repo de GitHub usado por el sistema de actualizaciones.
         buildConfigField("String", "REPO_OWNER", "\"LaManditacabra\"")
         buildConfigField("String", "REPO_NAME", "\"AsyncPlay-Reproductor-de-Musica-\"")
+    }
+
+    signingConfigs {
+        // Keystore propio de release: la firma NO depende de la máquina,
+        // así las actualizaciones se instalan sobre versiones anteriores.
+        if (hasReleaseSigning) {
+            create("release") {
+                if (useEnvSigning) {
+                    storeFile = file("keystore/release.keystore")
+                    storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
+                    keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: "release"
+                    keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+                } else {
+                    storeFile = file(keystoreProps.getProperty("keystoreFile"))
+                    storePassword = keystoreProps.getProperty("storePassword")
+                    keyAlias = keystoreProps.getProperty("keyAlias")
+                    keyPassword = keystoreProps.getProperty("keyPassword")
+                }
+            }
+        }
     }
 
     buildTypes {
@@ -30,11 +63,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            // En CI (GitHub Actions) se firma con el keystore de depuración para
-            // que el sistema de actualizaciones instale el APK sobre la app
-            // instalada desde Android Studio (misma firma de depuración).
-            signingConfig = if (System.getenv("CI") != null) {
-                signingConfigs.getByName("debug")
+            // Si hay credenciales de firma configuradas (local o CI), se firma el
+            // release; si no, queda sin firmar (no rompe el build).
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
             } else {
                 null
             }
@@ -77,6 +109,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.androidx.material.icons.extended)
     debugImplementation(libs.androidx.ui.tooling)
 
     // ---------------------------------------------------------------

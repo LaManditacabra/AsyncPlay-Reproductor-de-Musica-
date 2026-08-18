@@ -129,12 +129,13 @@ fun SearchScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(state.results, key = { it.url }) { result ->
+                        val queuedMessage = stringResource(R.string.search_download_queued)
                         SearchResultCard(
                             result = result,
                             onDownload = {
                                 viewModel.download(result)
                                 scope.launch {
-                                    snackbarHostState.showSnackbar(stringResource(R.string.search_download_queued))
+                                    snackbarHostState.showSnackbar(queuedMessage)
                                 }
                             },
                         )

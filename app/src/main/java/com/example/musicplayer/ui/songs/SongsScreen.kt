@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.musicplayer.ui.components.SongCard
+import com.example.musicplayer.ui.update.UpdateDialog
+import com.example.musicplayer.update.UpdateManager.UpdateState
 
 /**
  * Pantalla principal: lista de canciones guardadas consumida desde el
@@ -45,6 +47,7 @@ import com.example.musicplayer.ui.components.SongCard
 fun SongsScreen(viewModel: SongsViewModel = viewModel()) {
     val songs by viewModel.songs.collectAsStateWithLifecycle()
     val playerState by viewModel.playerState.collectAsStateWithLifecycle()
+    val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     var showAddDialog by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -99,6 +102,23 @@ fun SongsScreen(viewModel: SongsViewModel = viewModel()) {
                 showAddDialog = false
             },
         )
+    }
+
+    // Diálogo del sistema de actualizaciones (si hay una fase activa).
+    when (updateState) {
+        is UpdateState.Available,
+        is UpdateState.Downloading,
+        is UpdateState.Downloaded,
+        is UpdateState.Failed,
+        -> {
+            UpdateDialog(
+                updateState = updateState,
+                onDownload = viewModel::downloadUpdate,
+                onInstall = viewModel::installUpdate,
+                onDismiss = viewModel::dismissUpdate,
+            )
+        }
+        else -> Unit
     }
 }
 

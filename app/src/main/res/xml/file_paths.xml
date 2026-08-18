@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Rutas internas que el FileProvider puede exponer a otras apps. -->
+<paths>
+    <!-- filesDir/updates/ contienen los APK descargados de las actualizaciones. -->
+    <files-path name="updates" path="updates/" />
+</paths>

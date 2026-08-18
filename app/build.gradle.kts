@@ -15,6 +15,10 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+
+        // Configuración del repo de GitHub usado por el sistema de actualizaciones.
+        buildConfigField("String", "REPO_OWNER", "\"LaManditacabra\"")
+        buildConfigField("String", "REPO_NAME", "\"AsyncPlay-Reproductor-de-Musica-\"")
     }
 
     buildTypes {
@@ -36,6 +40,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

@@ -5,6 +5,10 @@ on:
     tags:
       - 'v*'
 
+# Necesario para que el token de GitHub pueda crear la release con el APK.
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest

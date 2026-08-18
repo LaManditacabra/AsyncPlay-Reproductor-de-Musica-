@@ -43,28 +43,73 @@ class UpdateManager(private val context: Context) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val client = GitHubReleasesClient()
+    private val prefs = UpdatePreferences(context)
 
     private val _state = MutableStateFlow<UpdateState>(UpdateState.Idle)
     val state: StateFlow<UpdateState> = _state.asStateFlow()
 
     /**
-     * Comprueba si hay una versión más reciente en GitHub. Si la comprobación
-     * falla (offline, rate-limit, sin releases) vuelve silenciosamente a [UpdateState.Idle].
+     * Comprueba si hay una versión más reciente en GitHub.
+     *
+     * Para no agotar el rate limit de la API:
+     *  - respeta un cooldown mínimo ([MIN_CHECK_INTERVAL_MS]) entre comprobaciones;
+     *  - usa `If-None-Match`/ETag (304 no consume cuota);
+     *  - si GitHub devuelve 403, no se vuelve a consultar hasta el `X-RateLimit-Reset`.
+     *
+     * Cualquier fallo (offline, rate-limit, sin releases) vuelve silenciosamente
+     * a [UpdateState.Idle].
      */
     fun checkForUpdates() {
         if (_state.value is UpdateState.Checking) return
         scope.launch {
             _state.value = UpdateState.Checking
             try {
-                val release = client.fetchLatestRelease()
-                val isNewer = release != null &&
-                    release.apkUrl.isNotBlank() &&
-                    VersionComparator.isNewer(release.tagName, BuildConfig.VERSION_NAME)
-                _state.value = if (isNewer) UpdateState.Available(release) else UpdateState.Idle
+                if (withinCooldown()) {
+                    _state.value = UpdateState.Idle
+                    return@launch
+                }
+                when (val result = client.fetchLatestRelease(prefs.etag)) {
+                    is LatestReleaseResult.Found -> {
+                        prefs.etag = result.etag
+                        prefs.lastCheckAt = System.currentTimeMillis()
+                        val release = result.release
+                        val isNewer = release.apkUrl.isNotBlank() &&
+                            VersionComparator.isNewer(release.tagName, BuildConfig.VERSION_NAME)
+                        _state.value =
+                            if (isNewer) UpdateState.Available(release) else UpdateState.Idle
+                    }
+                    // 304: nada cambió desde la última consulta (no consume cuota).
+                    LatestReleaseResult.NotModified -> {
+                        prefs.lastCheckAt = System.currentTimeMillis()
+                        _state.value = UpdateState.Idle
+                    }
+                    LatestReleaseResult.NoReleases -> {
+                        prefs.lastCheckAt = System.currentTimeMillis()
+                        _state.value = UpdateState.Idle
+                    }
+                    // 403: rate limit alcanzado. No consultar de nuevo hasta el reset.
+                    is LatestReleaseResult.RateLimited -> {
+                        if (result.resetAtEpochSeconds > 0) {
+                            prefs.rateLimitResetAt = result.resetAtEpochSeconds * 1_000
+                        }
+                        _state.value = UpdateState.Idle
+                    }
+                }
             } catch (e: Exception) {
                 _state.value = UpdateState.Idle
             }
         }
+    }
+
+    /**
+     * Devuelve `true` si hay que saltarse la comprobación: o bien se está dentro
+     * del periodo de cooldown, o bien GitHub pidió esperar al reset del rate limit.
+     */
+    private fun withinCooldown(): Boolean {
+        val now = System.currentTimeMillis()
+        if (now < prefs.rateLimitResetAt) return true
+        val lastCheck = prefs.lastCheckAt
+        return lastCheck > 0 && now - lastCheck < MIN_CHECK_INTERVAL_MS
     }
 
     /** Descarga el APK de la release disponible en segundo plano. */
@@ -138,5 +183,10 @@ class UpdateManager(private val context: Context) {
                 }
             }
         }
+    }
+
+    private companion object {
+        /** Tiempo mínimo entre comprobaciones de actualización. */
+        const val MIN_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1_000L // 6 horas
     }
 }

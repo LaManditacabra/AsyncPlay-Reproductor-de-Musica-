@@ -8,44 +8,74 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
+/** Resultado de la consulta de la última release. */
+sealed interface LatestReleaseResult {
+    /** Hay una release nueva; [etag] se guardará para futuras peticiones condicionales. */
+    data class Found(val release: ReleaseInfo, val etag: String?) : LatestReleaseResult
+
+    /** Nada cambió desde la última consulta (304). No consume rate limit. */
+    data object NotModified : LatestReleaseResult
+
+    /** El repo aún no tiene releases (404). */
+    data object NoReleases : LatestReleaseResult
+
+    /** Rate limit alcanzado (403); [resetAtEpochSeconds] indica cuándo se podrá reintentar. */
+    data class RateLimited(val resetAtEpochSeconds: Long) : LatestReleaseResult
+}
+
 /**
  * Cliente de la API pública de GitHub para consultar la última release del repo.
  *
  * Endpoint: `GET /repos/{owner}/{repo}/releases/latest`
- * (sin autenticación: 60 peticiones/hora por IP, suficiente para un chequeo ocasional).
+ *
+ * Protección contra el rate limit (60 peticiones/hora sin autenticación):
+ *  - peticiones condicionales con `If-None-Match`: si nada cambió, GitHub
+ *    responde 304 y ESA petición NO consume cuota;
+ *  - expone el estado 403/rate-limit con el instante de reset.
  */
 class GitHubReleasesClient {
 
     /**
      * Obtiene la última release publicada.
      *
-     * @return la [ReleaseInfo] de la última release, o `null` si el repo aún no
-     *         tiene releases (HTTP 404).
-     * @throws IOException ante errores de red o HTTP distintos de 404.
+     * @param etag ETag de la última respuesta 200 (o `null` en la primera consulta).
      */
-    suspend fun fetchLatestRelease(): ReleaseInfo? = withContext(Dispatchers.IO) {
-        val url =
-            "https://api.github.com/repos/${BuildConfig.REPO_OWNER}/${BuildConfig.REPO_NAME}/releases/latest"
-        val connection = URL(url).openConnection() as HttpURLConnection
-        try {
-            connection.requestMethod = "GET"
-            connection.connectTimeout = CONNECT_TIMEOUT_MS
-            connection.readTimeout = READ_TIMEOUT_MS
-            connection.setRequestProperty("Accept", "application/vnd.github+json")
-            connection.setRequestProperty("User-Agent", "AsyncPlay")
+    suspend fun fetchLatestRelease(etag: String? = null): LatestReleaseResult =
+        withContext(Dispatchers.IO) {
+            val url =
+                "https://api.github.com/repos/${BuildConfig.REPO_OWNER}/${BuildConfig.REPO_NAME}/releases/latest"
+            val connection = URL(url).openConnection() as HttpURLConnection
+            try {
+                connection.requestMethod = "GET"
+                connection.connectTimeout = CONNECT_TIMEOUT_MS
+                connection.readTimeout = READ_TIMEOUT_MS
+                connection.setRequestProperty("Accept", "application/vnd.github+json")
+                connection.setRequestProperty("User-Agent", "AsyncPlay")
+                // Petición condicional: si el ETag coincide, GitHub responde 304 sin coste.
+                etag?.let { connection.setRequestProperty(HEADER_IF_NONE_MATCH, it) }
 
-            when (connection.responseCode) {
-                HttpURLConnection.HTTP_OK -> {
-                    val body = connection.inputStream.bufferedReader().use { it.readText() }
-                    parseRelease(JSONObject(body))
+                when (connection.responseCode) {
+                    HttpURLConnection.HTTP_OK -> {
+                        val body = connection.inputStream.bufferedReader().use { it.readText() }
+                        LatestReleaseResult.Found(
+                            release = parseRelease(JSONObject(body)),
+                            etag = connection.getHeaderField(HEADER_ETAG),
+                        )
+                    }
+                    HttpURLConnection.HTTP_NOT_MODIFIED -> LatestReleaseResult.NotModified
+                    HttpURLConnection.HTTP_NOT_FOUND -> LatestReleaseResult.NoReleases
+                    HttpURLConnection.HTTP_FORBIDDEN -> LatestReleaseResult.RateLimited(
+                        resetAtEpochSeconds = connection
+                            .getHeaderField(HEADER_RATE_LIMIT_RESET)
+                            ?.toLongOrNull()
+                            ?: 0L,
+                    )
+                    else -> throw IOException("GitHub API error: ${connection.responseCode}")
                 }
-                HttpURLConnection.HTTP_NOT_FOUND -> null
-                else -> throw IOException("GitHub API error: ${connection.responseCode}")
+            } finally {
+                connection.disconnect()
             }
-        } finally {
-            connection.disconnect()
         }
-    }
 
     private fun parseRelease(json: JSONObject): ReleaseInfo {
         // Busca el primer asset con extensión .apk (puede haber varios por release).
@@ -70,5 +100,8 @@ class GitHubReleasesClient {
     private companion object {
         const val CONNECT_TIMEOUT_MS = 15_000
         const val READ_TIMEOUT_MS = 15_000
+        const val HEADER_IF_NONE_MATCH = "If-None-Match"
+        const val HEADER_ETAG = "ETag"
+        const val HEADER_RATE_LIMIT_RESET = "X-RateLimit-Reset"
     }
 }

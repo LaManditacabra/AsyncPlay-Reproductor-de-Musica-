@@ -4,6 +4,7 @@ import android.app.Application
 import com.example.musicplayer.data.db.AppDatabase
 import com.example.musicplayer.data.repository.SongRepository
 import com.example.musicplayer.player.PlaybackController
+import com.example.musicplayer.player.PlaybackPreferences
 import com.example.musicplayer.scraper.NewPipeDownloader
 import com.example.musicplayer.update.UpdateManager
 import java.util.Locale
@@ -23,6 +24,9 @@ class MusicPlayerApplication : Application() {
     lateinit var playbackController: PlaybackController
         private set
 
+    lateinit var playbackPreferences: PlaybackPreferences
+        private set
+
     lateinit var updateManager: UpdateManager
         private set
 
@@ -36,6 +40,7 @@ class MusicPlayerApplication : Application() {
         val database = AppDatabase.getInstance(this)
         repository = SongRepository(database.songDao())
         playbackController = PlaybackController(this)
+        playbackPreferences = PlaybackPreferences(this)
         updateManager = UpdateManager(this)
     }
 }

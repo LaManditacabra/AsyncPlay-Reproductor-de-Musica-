@@ -1,3 +1,58 @@
 <resources>
     <string name="app_name">AsyncPlay</string>
+
+    <!-- Pantalla de canciones -->
+    <string name="songs_title">Mi Música</string>
+    <string name="songs_add">Añadir canción</string>
+    <string name="songs_empty">Aún no hay canciones.\nPulsa el botón + para añadir desde YouTube.</string>
+    <string name="songs_show_all">Todas</string>
+    <string name="songs_show_favorites">Favoritas</string>
+
+    <!-- Acciones por canción -->
+    <string name="action_play">Reproducir</string>
+    <string name="action_pause">Pausar</string>
+    <string name="action_favorite">Marcar como favorita</string>
+    <string name="action_unfavorite">Quitar de favoritas</string>
+    <string name="action_delete">Eliminar</string>
+
+    <!-- Diálogo de añadir desde YouTube -->
+    <string name="add_song_title">Añadir desde YouTube</string>
+    <string name="add_song_description">Pega la URL del vídeo. El audio se descargará en segundo plano.</string>
+    <string name="add_song_url_label">URL de YouTube</string>
+    <string name="action_download">Descargar</string>
+    <string name="action_cancel">Cancelar</string>
+
+    <!-- Diálogo de borrar canción -->
+    <string name="delete_song_title">Eliminar canción</string>
+    <string name="delete_song_message">¿Eliminar “%1$s”? Esta acción no se puede deshacer.</string>
+
+    <!-- Reproductor -->
+    <string name="player_open">Abrir reproductor</string>
+    <string name="player_close">Cerrar reproductor</string>
+    <string name="player_next">Siguiente</string>
+    <string name="player_previous">Anterior</string>
+    <string name="player_shuffle">Modo aleatorio</string>
+    <string name="player_repeat">Repetición</string>
+
+    <!-- Búsqueda -->
+    <string name="search_title">Buscar en YouTube</string>
+    <string name="search_hint">Canciones, artistas, álbumes…</string>
+    <string name="search_loading">Buscando…</string>
+    <string name="search_empty">Escribe algo para buscar en YouTube.</string>
+    <string name="search_no_results">Sin resultados para “%1$s”.</string>
+    <string name="search_error">No se pudo realizar la búsqueda.</string>
+    <string name="search_download_queued">Descarga iniciada</string>
+
+    <!-- Actualizaciones -->
+    <string name="update_available_title">Nueva versión disponible</string>
+    <string name="update_version_label">Versión %1$s</string>
+    <string name="update_default_body">Ya puedes actualizar a la última versión.</string>
+    <string name="update_later">Más tarde</string>
+    <string name="update_downloading_title">Descargando actualización</string>
+    <string name="update_ready_title">Actualización lista</string>
+    <string name="update_ready_message">La nueva versión se descargó correctamente. Pulsa Instalar para completar la actualización.</string>
+    <string name="update_install">Instalar</string>
+    <string name="update_not_now">Ahora no</string>
+    <string name="update_error">Error</string>
+    <string name="action_close">Cerrar</string>
 </resources>

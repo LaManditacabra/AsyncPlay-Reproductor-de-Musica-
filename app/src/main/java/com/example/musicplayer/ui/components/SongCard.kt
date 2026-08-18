@@ -11,11 +11,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,21 +27,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.example.musicplayer.R
 import com.example.musicplayer.data.model.Song
 import com.example.musicplayer.util.formatDuration
 
 /**
- * Tarjeta de una canción: portada (Coil), título, artista, duración y botón de
- * reproducción/pausa.
+ * Tarjeta de una canción: portada (Coil), título, artista, duración y acciones
+ * de reproducción, favorito y eliminación.
  *
- * @param song        Canción a mostrar.
- * @param isCurrentSong Indica si esta canción es la que está sonando.
- * @param isPlaying   Indica si el reproductor está reproduciendo (para el icono).
- * @param onClick     Al pulsar la tarjeta (reproducir esta canción).
- * @param onPlayPause Al pulsar el botón central (reproducir/pausar).
+ * @param song            Canción a mostrar.
+ * @param isCurrentSong   Indica si esta canción es la que está sonando.
+ * @param isPlaying       Indica si el reproductor está reproduciendo (para el icono).
+ * @param onClick         Al pulsar la tarjeta (reproducir esta canción).
+ * @param onPlayPause     Al pulsar el botón central (reproducir/pausar).
+ * @param onToggleFavorite Al pulsar el corazón (marcar/desmarcar favorita).
+ * @param onDelete        Al pulsar el botón de eliminar.
  */
 @Composable
 fun SongCard(
@@ -46,6 +54,8 @@ fun SongCard(
     isPlaying: Boolean,
     onClick: () -> Unit,
     onPlayPause: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     ElevatedCard(
@@ -100,7 +110,35 @@ fun SongCard(
                 val playingThis = isCurrentSong && isPlaying
                 Icon(
                     imageVector = if (playingThis) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (playingThis) "Pausar" else "Reproducir",
+                    contentDescription = if (playingThis) {
+                        stringResource(R.string.action_pause)
+                    } else {
+                        stringResource(R.string.action_play)
+                    },
+                )
+            }
+
+            // Corazón de favorito.
+            IconButton(onClick = onToggleFavorite) {
+                Icon(
+                    imageVector = if (song.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                    contentDescription = stringResource(
+                        if (song.isFavorite) R.string.action_unfavorite else R.string.action_favorite,
+                    ),
+                    tint = if (song.isFavorite) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
+
+            // Eliminar canción.
+            IconButton(onClick = onDelete) {
+                Icon(
+                    imageVector = Icons.Filled.Delete,
+                    contentDescription = stringResource(R.string.action_delete),
+                    tint = MaterialTheme.colorScheme.error,
                 )
             }
         }

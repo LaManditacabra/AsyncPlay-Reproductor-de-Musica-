@@ -28,8 +28,9 @@ import kotlinx.coroutines.launch
  * Media3 Session) y expone el estado de reproducción como un [StateFlow]
  * observable para que la UI reaccione de forma reactiva.
  *
- * También centraliza las acciones de reproducción: reproducir una lista desde
- * un índice, pausar/reanudar, saltar de canción y buscar (seek).
+ * Centraliza todas las acciones de reproducción: reproducir una lista desde un
+ * índice, pausar/reanudar, saltar, buscar, modo aleatorio y repetición. También
+ * persiste la posición de la última canción para reanudarla al abrir la app.
  */
 class PlaybackController(context: Context) : Player.Listener {
 
@@ -41,9 +42,12 @@ class PlaybackController(context: Context) : Player.Listener {
         val positionMs: Long = 0L,
         val durationMs: Long = 0L,
         val currentSong: Song? = null,
+        val shuffleEnabled: Boolean = false,
+        val repeatMode: Int = Player.REPEAT_MODE_OFF,
     )
 
     private val appContext = context.applicationContext
+    private val preferences = PlaybackPreferences(appContext)
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val _state = MutableStateFlow(PlaybackState())
@@ -51,6 +55,7 @@ class PlaybackController(context: Context) : Player.Listener {
 
     private var mediaController: MediaController? = null
     private var tickerJob: Job? = null
+    private var lastSavedPositionMs = 0L
 
     /** Lista de canciones que se está reproduciendo (para conocer la actual). */
     private var currentPlaylist: List<Song> = emptyList()
@@ -81,13 +86,20 @@ class PlaybackController(context: Context) : Player.Listener {
         override fun onConnected(controller: MediaController) {
             mediaController = controller
             controller.addListener(this@PlaybackController)
-            _state.update { it.copy(isConnected = true) }
+            _state.update {
+                it.copy(
+                    isConnected = true,
+                    shuffleEnabled = controller.shuffleModeEnabled,
+                    repeatMode = controller.repeatMode,
+                )
+            }
 
             // Ejecuta la reproducción pendiente (si se pidió antes de conectar).
             pendingPlay?.let { (songs, index) ->
                 playAt(songs, index)
                 pendingPlay = null
             }
+            handlePendingRestoreIfNeeded()
             startTicker()
         }
 
@@ -121,6 +133,22 @@ class PlaybackController(context: Context) : Player.Listener {
         }
     }
 
+    /**
+     * Restaura una canción concreta en una posición dada, sin reproducirla.
+     * Se usa al arrancar la app para "reanudar" la última sesión.
+     */
+    fun restorePosition(songs: List<Song>, songId: Long, positionMs: Long) {
+        val index = songs.indexOfFirst { it.id == songId }
+        if (index < 0) return
+        val controller = mediaController
+        if (controller == null) {
+            // No queremos autoplay; solo preparar la lista al conectar.
+            pendingRestore = songs to index to positionMs
+        } else {
+            restoreAt(songs, index, positionMs)
+        }
+    }
+
     /** Pausa si está sonando o reanuda si está en pausa. */
     fun togglePlayPause() {
         mediaController?.let { controller ->
@@ -137,9 +165,29 @@ class PlaybackController(context: Context) : Player.Listener {
 
     fun skipToPrevious() = mediaController?.seekToPreviousMediaItem()
 
+    /** Alterna el modo aleatorio (shuffle). */
+    fun toggleShuffle() {
+        mediaController?.let { controller ->
+            controller.shuffleModeEnabled = !controller.shuffleModeEnabled
+        }
+    }
+
+    /** Cicla el modo de repetición: Off -> All -> One -> Off. */
+    fun cycleRepeatMode() {
+        mediaController?.let { controller ->
+            controller.repeatMode = when (controller.repeatMode) {
+                Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+                Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+                else -> Player.REPEAT_MODE_OFF
+            }
+        }
+    }
+
     // ------------------------------------------------------------------
     // Interno
     // ------------------------------------------------------------------
+
+    private var pendingRestore: Pair<Pair<List<Song>, Int>, Long>? = null
 
     private fun playAt(songs: List<Song>, startIndex: Int) {
         val controller = mediaController ?: return
@@ -148,6 +196,23 @@ class PlaybackController(context: Context) : Player.Listener {
         controller.prepare()
         controller.play()
         _state.update { it.copy(currentSong = songs.getOrNull(startIndex)) }
+    }
+
+    private fun restoreAt(songs: List<Song>, index: Int, positionMs: Long) {
+        val controller = mediaController ?: return
+        currentPlaylist = songs
+        controller.setMediaItems(songs.map { it.toMediaItem() }, index, positionMs)
+        controller.prepare()
+        _state.update { it.copy(currentSong = songs.getOrNull(index)) }
+    }
+
+    private fun handlePendingRestoreIfNeeded() {
+        if (mediaController != null) {
+            pendingRestore?.let { (indexed, positionMs) ->
+                restoreAt(indexed.first, indexed.second, positionMs)
+                pendingRestore = null
+            }
+        }
     }
 
     /** Convierte una [Song] en un [MediaItem] con metadatos para la notificación. */
@@ -164,7 +229,7 @@ class PlaybackController(context: Context) : Player.Listener {
             )
             .build()
 
-    /** Actualiza la posición cada 500 ms mientras hay reproducción. */
+    /** Actualiza la posición cada 500 ms y persiste el progreso cada ~5 s. */
     private fun startTicker() {
         stopTicker()
         tickerJob = scope.launch {
@@ -175,12 +240,24 @@ class PlaybackController(context: Context) : Player.Listener {
                             isPlaying = controller.isPlaying,
                             positionMs = controller.currentPosition,
                             durationMs = controller.duration,
+                            shuffleEnabled = controller.shuffleModeEnabled,
+                            repeatMode = controller.repeatMode,
                         )
                     }
+                    persistProgress(controller)
                 }
                 delay(TICK_MS)
             }
         }
+    }
+
+    /** Guarda la posición actual (como máximo 1 vez cada 5 s). */
+    private fun persistProgress(controller: MediaController) {
+        val position = controller.currentPosition
+        if (position <= 0 || position - lastSavedPositionMs < SAVE_INTERVAL_MS) return
+        lastSavedPositionMs = position
+        preferences.lastSongId = currentPlaylist.getOrNull(controller.currentMediaItemIndex)?.id ?: -1
+        preferences.lastPositionMs = position
     }
 
     private fun stopTicker() {
@@ -203,11 +280,23 @@ class PlaybackController(context: Context) : Player.Listener {
     /** Al cambiar de canción (auto-next incluido) actualizamos la canción actual. */
     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
         val index = mediaController?.currentMediaItemIndex ?: 0
-        _state.update { it.copy(currentSong = currentPlaylist.getOrNull(index)) }
+        val song = currentPlaylist.getOrNull(index)
+        _state.update { it.copy(currentSong = song) }
+        song?.let { preferences.lastSongId = it.id }
+    }
+
+    /** Actualiza el estado cuando cambia el modo aleatorio o de repetición. */
+    override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+        _state.update { it.copy(shuffleEnabled = shuffleModeEnabled) }
+    }
+
+    override fun onRepeatModeChanged(repeatMode: Int) {
+        _state.update { it.copy(repeatMode = repeatMode) }
     }
 
     private companion object {
         const val TAG = "PlaybackController"
         const val TICK_MS = 500L
+        const val SAVE_INTERVAL_MS = 5_000L
     }
 }

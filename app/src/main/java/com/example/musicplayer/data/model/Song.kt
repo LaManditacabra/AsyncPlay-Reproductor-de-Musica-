@@ -35,8 +35,14 @@ data class Song(
 
     @ColumnInfo(name = "thumbnail_url")
     val thumbnailUrl: String? = null,
+
+    @ColumnInfo(name = "is_favorite")
+    val isFavorite: Boolean = false,
 ) {
 
     /** Devuelve la [Uri] local del archivo de audio, lista para ExoPlayer. */
     fun toUri(): Uri = Uri.fromFile(File(localPath))
+
+    /** Copia con el estado de favorito actualizado. */
+    fun withFavorite(favorite: Boolean): Song = copy(isFavorite = favorite)
 }

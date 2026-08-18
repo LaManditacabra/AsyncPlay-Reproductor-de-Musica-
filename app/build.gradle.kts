@@ -23,11 +23,21 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
+            // Minify desactivado: NewPipeExtractor usa reflection/SPI y R8 podría
+            // romper la extracción. Se mantiene el proguard-rules.pro para el futuro.
+            isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            // En CI (GitHub Actions) se firma con el keystore de depuración para
+            // que el sistema de actualizaciones instale el APK sobre la app
+            // instalada desde Android Studio (misma firma de depuración).
+            signingConfig = if (System.getenv("CI") != null) {
+                signingConfigs.getByName("debug")
+            } else {
+                null
+            }
         }
     }
 
@@ -57,6 +67,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.navigation.compose)
 
     // ---------------------------------------------------------------
     // Jetpack Compose + Material Design 3

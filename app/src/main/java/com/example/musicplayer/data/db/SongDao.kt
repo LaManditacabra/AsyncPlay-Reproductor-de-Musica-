@@ -26,7 +26,11 @@ interface SongDao {
     @Delete
     suspend fun delete(song: Song)
 
-    /** Observa todas las canciones ordenadas por orden de inserción. */
-    @Query("SELECT * FROM songs ORDER BY id ASC")
-    fun observeSongs(): Flow<List<Song>>
+    /** Observa todas las canciones, opcionalmente solo las favoritas. */
+    @Query("SELECT * FROM songs WHERE (:favoritesOnly = 0 OR is_favorite = 1) ORDER BY id ASC")
+    fun observeSongs(favoritesOnly: Boolean): Flow<List<Song>>
+
+    /** Marca o desmarca una canción como favorita. */
+    @Query("UPDATE songs SET is_favorite = :favorite WHERE id = :songId")
+    suspend fun setFavorite(songId: Long, favorite: Boolean)
 }

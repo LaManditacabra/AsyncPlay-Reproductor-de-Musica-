@@ -12,12 +12,17 @@ import kotlinx.coroutines.flow.Flow
  */
 class SongRepository(private val songDao: SongDao) {
 
-    /** Flujo reactivo con todas las canciones guardadas. */
-    val songs: Flow<List<Song>> = songDao.observeSongs()
+    /** Flujo reactivo con las canciones, filtrable por favoritas. */
+    fun songs(favoritesOnly: Boolean = false): Flow<List<Song>> =
+        songDao.observeSongs(favoritesOnly)
 
     /** Guarda una canción en la base de datos. */
     suspend fun addSong(song: Song): Long = songDao.insert(song)
 
     /** Elimina una canción de la base de datos. */
     suspend fun deleteSong(song: Song) = songDao.delete(song)
+
+    /** Marca o desmarca una canción como favorita. */
+    suspend fun setFavorite(songId: Long, favorite: Boolean) =
+        songDao.setFavorite(songId, favorite)
 }

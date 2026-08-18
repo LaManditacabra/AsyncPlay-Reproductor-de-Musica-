@@ -13,7 +13,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.example.musicplayer.R
 import com.example.musicplayer.update.ReleaseInfo
 import com.example.musicplayer.update.UpdateManager.UpdateState
 
@@ -45,25 +47,31 @@ private fun AvailableDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Nueva versión disponible") },
+        title = { Text(stringResource(R.string.update_available_title)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(
-                    text = "Versión ${release.tagName}",
+                    text = stringResource(R.string.update_version_label, release.tagName),
                     style = MaterialTheme.typography.titleSmall,
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = release.body.ifBlank { "Ya puedes actualizar a la última versión." },
+                    text = release.body.ifBlank {
+                        stringResource(R.string.update_default_body)
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
         },
         confirmButton = {
-            TextButton(onClick = onDownload) { Text("Descargar") }
+            TextButton(onClick = onDownload) {
+                Text(stringResource(R.string.action_download))
+            }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Más tarde") }
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.update_later))
+            }
         },
     )
 }
@@ -72,7 +80,7 @@ private fun AvailableDialog(
 private fun DownloadingDialog(progress: Int) {
     AlertDialog(
         onDismissRequest = {},
-        title = { Text("Descargando actualización") },
+        title = { Text(stringResource(R.string.update_downloading_title)) },
         text = {
             Column {
                 if (progress > 0) {
@@ -99,15 +107,17 @@ private fun DownloadedDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Actualización lista") },
-        text = {
-            Text("La nueva versión se descargó correctamente. Pulsa Instalar para completar la actualización.")
-        },
+        title = { Text(stringResource(R.string.update_ready_title)) },
+        text = { Text(stringResource(R.string.update_ready_message)) },
         confirmButton = {
-            TextButton(onClick = onInstall) { Text("Instalar") }
+            TextButton(onClick = onInstall) {
+                Text(stringResource(R.string.update_install))
+            }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Ahora no") }
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.update_not_now))
+            }
         },
     )
 }
@@ -116,10 +126,12 @@ private fun DownloadedDialog(
 private fun FailedDialog(message: String, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Error") },
+        title = { Text(stringResource(R.string.update_error)) },
         text = { Text(message) },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Cerrar") }
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_close))
+            }
         },
     )
 }

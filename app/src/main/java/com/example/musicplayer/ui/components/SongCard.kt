@@ -14,8 +14,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -26,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -46,6 +49,7 @@ import com.example.musicplayer.util.formatDuration
  * @param onPlayPause     Al pulsar el botón central (reproducir/pausar).
  * @param onToggleFavorite Al pulsar el corazón (marcar/desmarcar favorita).
  * @param onDelete        Al pulsar el botón de eliminar.
+ * @param onMore          Si se pasa, muestra el menú ⋮ (p. ej. "Agregar a playlist").
  */
 @Composable
 fun SongCard(
@@ -56,19 +60,23 @@ fun SongCard(
     onPlayPause: () -> Unit,
     onToggleFavorite: () -> Unit,
     onDelete: () -> Unit,
+    onMore: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     ElevatedCard(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        ),
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Portada de la canción cargada con Coil. Si no hay imagen,
-            // se muestra el color de fondo de la tarjeta.
+            // Portada de la canción cargada con Coil. Si no hay imagen, se
+            // muestra un degradado de color en su lugar.
             AsyncImage(
                 model = song.thumbnailUrl,
                 contentDescription = song.title,
@@ -76,7 +84,14 @@ fun SongCard(
                 modifier = Modifier
                     .size(56.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                    .background(
+                        Brush.linearGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.primary,
+                                MaterialTheme.colorScheme.tertiary,
+                            ),
+                        ),
+                    ),
             )
 
             Spacer(modifier = Modifier.width(12.dp))
@@ -131,6 +146,16 @@ fun SongCard(
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
                 )
+            }
+
+            // Menú de acciones extra (agregar a playlist, etc.).
+            if (onMore != null) {
+                IconButton(onClick = onMore) {
+                    Icon(
+                        imageVector = Icons.Filled.MoreVert,
+                        contentDescription = stringResource(R.string.playlist_add),
+                    )
+                }
             }
 
             // Eliminar canción.

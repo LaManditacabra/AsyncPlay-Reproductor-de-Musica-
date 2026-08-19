@@ -43,6 +43,8 @@ class PlaybackController(context: Context) : Player.Listener {
         val positionMs: Long = 0L,
         val durationMs: Long = 0L,
         val currentSong: Song? = null,
+        val currentIndex: Int = 0,
+        val queue: List<Song> = emptyList(),
         val shuffleEnabled: Boolean = false,
         val repeatMode: Int = Player.REPEAT_MODE_OFF,
     )
@@ -175,6 +177,11 @@ class PlaybackController(context: Context) : Player.Listener {
 
     fun skipToPrevious() = mediaController?.seekToPreviousMediaItem()
 
+    /** Salta a un elemento concreto de la cola (p. ej. desde "Up next"). */
+    fun skipToIndex(index: Int) {
+        mediaController?.seekTo(index, 0L)
+    }
+
     /** Alterna el modo aleatorio (shuffle). */
     fun toggleShuffle() {
         mediaController?.let { controller ->
@@ -205,7 +212,9 @@ class PlaybackController(context: Context) : Player.Listener {
         controller.setMediaItems(songs.map { it.toMediaItem() }, startIndex, 0L)
         controller.prepare()
         controller.play()
-        _state.update { it.copy(currentSong = songs.getOrNull(startIndex)) }
+        _state.update {
+            it.copy(currentSong = songs.getOrNull(startIndex), queue = songs, currentIndex = startIndex)
+        }
     }
 
     private fun restoreAt(songs: List<Song>, index: Int, positionMs: Long) {
@@ -213,7 +222,9 @@ class PlaybackController(context: Context) : Player.Listener {
         currentPlaylist = songs
         controller.setMediaItems(songs.map { it.toMediaItem() }, index, positionMs)
         controller.prepare()
-        _state.update { it.copy(currentSong = songs.getOrNull(index)) }
+        _state.update {
+            it.copy(currentSong = songs.getOrNull(index), queue = songs, currentIndex = index)
+        }
     }
 
     private fun handlePendingRestoreIfNeeded() {
@@ -297,7 +308,7 @@ class PlaybackController(context: Context) : Player.Listener {
     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
         val index = mediaController?.currentMediaItemIndex ?: 0
         val song = currentPlaylist.getOrNull(index)
-        _state.update { it.copy(currentSong = song) }
+        _state.update { it.copy(currentSong = song, currentIndex = index) }
         song?.let { preferences.lastSongId = it.id }
     }
 

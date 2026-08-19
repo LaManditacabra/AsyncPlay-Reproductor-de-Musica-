@@ -3,11 +3,15 @@ package com.example.musicplayer.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // Paleta clara
-val Purple40 = Color(0xFF6650A4)
-val PurpleGrey40 = Color(0xFF625B71)
-val Pink40 = Color(0xFF7D5260)
+val Violet40 = Color(0xFF6750A4)
+val Teal40 = Color(0xFF00897B)
+val Magenta40 = Color(0xFFD81B60)
 
 // Paleta oscura
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
+val Violet80 = Color(0xFFB388FF)
+val Teal80 = Color(0xFF80CBC4)
+val Magenta80 = Color(0xFFF48FB1)
+
+// Gradiente por defecto para portadas sin imagen.
+val ArtworkGradientLight = listOf(Color(0xFF6750A4), Color(0xFFD81B60))
+val ArtworkGradientDark = listOf(Color(0xFF4A3B7A), Color(0xFF7A3B5C))

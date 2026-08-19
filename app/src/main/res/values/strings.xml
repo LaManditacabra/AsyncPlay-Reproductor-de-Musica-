@@ -7,6 +7,13 @@
     <string name="songs_empty">Aún no hay canciones.\nPulsa el botón + para añadir desde YouTube.</string>
     <string name="songs_show_all">Todas</string>
     <string name="songs_show_favorites">Favoritas</string>
+    <string name="library_search_hint">Buscar en tu música…</string>
+    <string name="action_clear_search">Borrar búsqueda</string>
+    <string name="sort_label">Ordenar</string>
+    <string name="sort_title">Título</string>
+    <string name="sort_artist">Artista</string>
+    <string name="sort_duration">Duración</string>
+    <string name="sort_newest">Más recientes</string>
 
     <!-- Acciones por canción -->
     <string name="action_play">Reproducir</string>
@@ -33,6 +40,7 @@
     <string name="player_previous">Anterior</string>
     <string name="player_shuffle">Modo aleatorio</string>
     <string name="player_repeat">Repetición</string>
+    <string name="player_queue_title">Próximas</string>
 
     <!-- Búsqueda -->
     <string name="search_title">Buscar en YouTube</string>
@@ -55,6 +63,11 @@
     <string name="download_pending_title">Descarga en curso</string>
     <string name="download_status_extracting">Extrayendo información…</string>
     <string name="download_status_downloading">Descargando…</string>
+    <string name="download_status_playlist_extracting">Extrayendo playlist…</string>
+    <string name="download_status_playlist_downloading">Descargando playlist…</string>
+    <string name="playlist_download_progress">Canción %1$d de %2$d</string>
+    <string name="playlist_downloaded">Playlist descargada: %1$d canción(es)</string>
+    <string name="add_playlist_description">Pega la URL de una playlist. Se descargarán todas sus canciones en segundo plano.</string>
 
     <!-- Actualizaciones -->
     <string name="update_available_title">Nueva versión disponible</string>
@@ -68,4 +81,28 @@
     <string name="update_not_now">Ahora no</string>
     <string name="update_error">Error</string>
     <string name="action_close">Cerrar</string>
+
+    <!-- Playlists -->
+    <string name="playlist_title">Playlists</string>
+    <string name="playlist_new">Nueva playlist</string>
+    <string name="playlist_name_label">Nombre de la playlist</string>
+    <string name="playlist_create">Crear</string>
+    <string name="playlist_song_count">%1$d canciones</string>
+    <string name="playlist_empty">Todavía no hay playlists.\nPulsa + para crear la primera.</string>
+    <string name="playlist_songs_empty">Esta playlist está vacía.\nAgrega canciones desde la biblioteca con el menú ⋮.</string>
+    <string name="playlist_add">Agregar a playlist</string>
+    <string name="playlist_add_new_and_add">Crear y agregar</string>
+    <string name="playlist_existing">O elige una existente:</string>
+    <string name="playlist_added">Agregada a %1$s</string>
+    <string name="playlist_already_in">Ya está en %1$s</string>
+    <string name="playlist_delete_confirm_title">Eliminar playlist</string>
+    <string name="playlist_delete_confirm_message">¿Eliminar “%1$s”? Las canciones no se borrarán.</string>
+    <string name="action_back">Volver</string>
+
+    <!-- Ajustes -->
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_theme_label">Tema</string>
+    <string name="settings_theme_system">Automático</string>
+    <string name="settings_theme_light">Claro</string>
+    <string name="settings_theme_dark">Oscuro</string>
 </resources>

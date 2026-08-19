@@ -1,7 +1,6 @@
 package com.example.musicplayer.scraper
 
 import android.content.Context
-import android.net.Uri
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -11,8 +10,6 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.example.musicplayer.MusicPlayerApplication
-import com.example.musicplayer.data.model.Song
-import java.io.File
 import java.util.concurrent.TimeUnit
 
 /**
@@ -37,73 +34,31 @@ class DownloadWorker(
     override suspend fun doWork(): Result {
         val videoUrl = inputData.getString(KEY_VIDEO_URL) ?: return Result.failure()
         return try {
-            // 1) Normaliza URLs cortas (youtu.be/...) a URLs que NewPipe entienda.
+            // 1) Normaliza URLs cortas (youtu.be/...) y extrae el vídeo.
             setProgress(workDataOf(KEY_STATUS to STATUS_EXTRACTING))
-            val extracted = YouTubeExtractor().extractStream(normalizeUrl(videoUrl))
 
-            // 2) Descarga del audio en el directorio privado de la app, con progreso.
-            setProgress(
-                workDataOf(
-                    KEY_STATUS to STATUS_DOWNLOADING,
-                    KEY_TITLE to extracted.title,
-                ),
-            )
-            val audioFile = audioFile(extracted.videoId, extracted.audioExtension)
-            FileDownloader.downloadWithProgress(extracted.audioUrl, audioFile) { percent ->
+            // 2) Descarga del audio, portada y persistencia (lógica compartida).
+            val title = SongDownloader.downloadOne(
+                context = applicationContext,
+                videoUrl = videoUrl,
+                repository = repository,
+            ) { songTitle, percent ->
                 setProgress(
                     workDataOf(
                         KEY_STATUS to STATUS_DOWNLOADING,
-                        KEY_TITLE to extracted.title,
+                        KEY_TITLE to songTitle,
                         KEY_PROGRESS to percent,
                     ),
                 )
             }
 
-            // 3) Descarga de la portada (si el vídeo tiene una). Si falla, seguimos.
-            val artworkPath = extracted.thumbnailUrl?.let { thumbUrl ->
-                try {
-                    val file = artworkFile(extracted.videoId)
-                    FileDownloader.download(thumbUrl, file)
-                    Uri.fromFile(file).toString()
-                } catch (e: Exception) {
-                    null
-                }
-            }
-
-            // 4) Persistencia en la base de datos local.
-            repository.addSong(
-                Song(
-                    title = extracted.title,
-                    artist = extracted.artist,
-                    durationMs = extracted.durationSeconds * 1_000,
-                    localPath = audioFile.absolutePath,
-                    thumbnailUrl = artworkPath,
-                ),
-            )
-            Result.success(workDataOf(KEY_SONG_TITLE to extracted.title))
+            // 3) Éxito: reporta el título para que la UI lo muestre.
+            Result.success(workDataOf(KEY_SONG_TITLE to title, KEY_TYPE to TYPE_SINGLE))
         } catch (e: Exception) {
             android.util.Log.e(TAG, "Fallo descargando $videoUrl", e)
             Result.failure(workDataOf(KEY_ERROR to (e.message ?: e.javaClass.simpleName)))
         }
     }
-
-    /** Convierte `youtu.be/<id>` en `https://www.youtube.com/watch?v=<id>`. */
-    private fun normalizeUrl(url: String): String {
-        val shortLink = Regex("""youtu\.be/([\w-]{6,})""").find(url)
-        return if (shortLink != null) {
-            "https://www.youtube.com/watch?v=${shortLink.groupValues[1]}"
-        } else {
-            url
-        }
-    }
-
-    /** Ruta del archivo de audio: filesDir/music/<videoId>.<ext>. */
-    private fun audioFile(videoId: String, extension: String): File =
-        File(applicationContext.filesDir, "$AUDIO_DIR/$videoId.$extension")
-
-    /** Ruta del archivo de portada: filesDir/artwork/<videoId>.jpg. */
-    private fun artworkFile(videoId: String): File =
-        File(applicationContext.filesDir, "$ARTWORK_DIR/$videoId.jpg")
 
     companion object {
         const val TAG = "youtube_download"
@@ -113,12 +68,17 @@ class DownloadWorker(
         const val KEY_STATUS = "status"
         const val KEY_PROGRESS = "progress"
         const val KEY_TITLE = "title"
+        const val KEY_TYPE = "type"
+        const val KEY_DONE = "done"
+        const val KEY_TOTAL = "total"
+
+        const val TYPE_SINGLE = "single"
+        const val TYPE_PLAYLIST = "playlist"
 
         const val STATUS_EXTRACTING = "extracting"
         const val STATUS_DOWNLOADING = "downloading"
-
-        private const val AUDIO_DIR = "music"
-        private const val ARTWORK_DIR = "artwork"
+        const val STATUS_PLAYLIST_EXTRACTING = "playlist_extracting"
+        const val STATUS_PLAYLIST_DOWNLOADING = "playlist_downloading"
 
         /**
          * Encola la descarga de un vídeo de YouTube. Requiere conexión a internet
@@ -127,7 +87,7 @@ class DownloadWorker(
         fun start(context: Context, videoUrl: String) {
             val request = OneTimeWorkRequestBuilder<DownloadWorker>()
                 .addTag(TAG)
-                .setInputData(workDataOf(KEY_VIDEO_URL to videoUrl))
+                .setInputData(workDataOf(KEY_VIDEO_URL to videoUrl, KEY_TYPE to TYPE_SINGLE))
                 .setConstraints(
                     Constraints.Builder()
                         .setRequiredNetworkType(NetworkType.CONNECTED)

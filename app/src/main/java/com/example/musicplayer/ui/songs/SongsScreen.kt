@@ -6,20 +6,30 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FloatingActionButton
@@ -49,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.musicplayer.R
+import com.example.musicplayer.data.model.Playlist
 import com.example.musicplayer.data.model.Song
 import com.example.musicplayer.scraper.DownloadWorker
 import com.example.musicplayer.ui.components.MiniPlayerBar
@@ -67,6 +78,8 @@ import com.example.musicplayer.update.UpdateManager.UpdateState
 @Composable
 fun SongsScreen(
     onNavigateToSearch: () -> Unit,
+    onNavigateToPlaylists: () -> Unit,
+    onNavigateToSettings: () -> Unit,
     viewModel: SongsViewModel = viewModel(),
 ) {
     val songs by viewModel.songs.collectAsStateWithLifecycle()
@@ -74,8 +87,13 @@ fun SongsScreen(
     val playerState by viewModel.playerState.collectAsStateWithLifecycle()
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     val activeDownloads by viewModel.activeDownloads.collectAsStateWithLifecycle()
+    val playlists by viewModel.playlists.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val sortMode by viewModel.sortMode.collectAsStateWithLifecycle()
+    var sortMenuOpen by remember { mutableStateOf(false) }
     var showAddDialog by remember { mutableStateOf(false) }
     var songToDelete by remember { mutableStateOf<Song?>(null) }
+    var songForPlaylist by remember { mutableStateOf<Song?>(null) }
     var showPlayer by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -119,6 +137,20 @@ fun SongsScreen(
                                 contentDescription = stringResource(R.string.import_songs),
                             )
                         }
+                        // Playlists.
+                        IconButton(onClick = onNavigateToPlaylists) {
+                            Icon(
+                                imageVector = Icons.Filled.PlaylistPlay,
+                                contentDescription = stringResource(R.string.playlist_title),
+                            )
+                        }
+                        // Ajustes.
+                        IconButton(onClick = onNavigateToSettings) {
+                            Icon(
+                                imageVector = Icons.Filled.Settings,
+                                contentDescription = stringResource(R.string.settings_title),
+                            )
+                        }
                         // Búsqueda en YouTube.
                         IconButton(onClick = onNavigateToSearch) {
                             Icon(
@@ -144,6 +176,63 @@ fun SongsScreen(
                     .fillMaxSize()
                     .padding(innerPadding),
             ) {
+                // Búsqueda local + criterio de ordenación.
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = viewModel::setSearchQuery,
+                        placeholder = { Text(stringResource(R.string.library_search_hint)) },
+                        leadingIcon = {
+                            Icon(Icons.Filled.Search, contentDescription = null)
+                        },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                                    Icon(
+                                        Icons.Filled.Close,
+                                        contentDescription = stringResource(R.string.action_clear_search),
+                                    )
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box {
+                        IconButton(onClick = { sortMenuOpen = true }) {
+                            Icon(
+                                Icons.Filled.Sort,
+                                contentDescription = stringResource(R.string.sort_label),
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = sortMenuOpen,
+                            onDismissRequest = { sortMenuOpen = false },
+                        ) {
+                            SortMode.entries.forEach { mode ->
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(mode.labelRes())) },
+                                    onClick = {
+                                        viewModel.setSortMode(mode)
+                                        sortMenuOpen = false
+                                    },
+                                    leadingIcon = {
+                                        if (mode == sortMode) {
+                                            Icon(Icons.Filled.Check, contentDescription = null)
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // Descargas en curso: señal de vida con estado y progreso.
                 if (activeDownloads.isNotEmpty()) {
                     Column(
@@ -189,6 +278,7 @@ fun SongsScreen(
                                 },
                                 onToggleFavorite = { viewModel.toggleFavorite(song) },
                                 onDelete = { songToDelete = song },
+                                onMore = { songForPlaylist = song },
                             )
                         }
                     }
@@ -199,6 +289,11 @@ fun SongsScreen(
                     MiniPlayerBar(
                         song = song,
                         isPlaying = playerState.isPlaying,
+                        progress = if (playerState.durationMs > 0) {
+                            playerState.positionMs.toFloat() / playerState.durationMs
+                        } else {
+                            0f
+                        },
                         onClick = { showPlayer = true },
                         onPlayPause = viewModel::togglePlayPause,
                     )
@@ -217,6 +312,7 @@ fun SongsScreen(
                 onSkipPrevious = viewModel::skipToPrevious,
                 onToggleShuffle = viewModel::toggleShuffle,
                 onCycleRepeat = viewModel::cycleRepeatMode,
+                onSkipToIndex = viewModel::skipToIndex,
             )
         }
     }
@@ -228,6 +324,22 @@ fun SongsScreen(
             onAdd = { url ->
                 viewModel.downloadFromUrl(url)
                 showAddDialog = false
+            },
+        )
+    }
+
+    // Selector de playlist para agregar la canción tocada (menú ⋮).
+    songForPlaylist?.let { song ->
+        AddToPlaylistDialog(
+            playlists = playlists,
+            onDismiss = { songForPlaylist = null },
+            onCreateAndAdd = { name ->
+                viewModel.createPlaylistAndAdd(name, song.id)
+                songForPlaylist = null
+            },
+            onAddToPlaylist = { playlistId ->
+                viewModel.addSongToPlaylist(playlistId, song.id)
+                songForPlaylist = null
             },
         )
     }
@@ -285,11 +397,21 @@ private fun EmptyState(modifier: Modifier = Modifier) {
     }
 }
 
+/** Recurso de texto para el nombre de un criterio de ordenación. */
+private fun SortMode.labelRes(): Int = when (this) {
+    SortMode.TITLE -> R.string.sort_title
+    SortMode.ARTIST -> R.string.sort_artist
+    SortMode.DURATION -> R.string.sort_duration
+    SortMode.NEWEST -> R.string.sort_newest
+}
+
 /** Tarjeta que muestra el estado y progreso de una descarga en curso. */
 @Composable
 private fun DownloadStatusCard(download: ActiveDownload) {
     val statusText = when (download.status) {
         DownloadWorker.STATUS_DOWNLOADING -> stringResource(R.string.download_status_downloading)
+        DownloadWorker.STATUS_PLAYLIST_EXTRACTING -> stringResource(R.string.download_status_playlist_extracting)
+        DownloadWorker.STATUS_PLAYLIST_DOWNLOADING -> stringResource(R.string.download_status_playlist_downloading)
         else -> stringResource(R.string.download_status_extracting)
     }
 
@@ -302,11 +424,23 @@ private fun DownloadStatusCard(download: ActiveDownload) {
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = statusText,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (download.total > 0) {
+                Text(
+                    text = stringResource(
+                        R.string.playlist_download_progress,
+                        (download.done + 1).coerceAtMost(download.total),
+                        download.total,
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                Text(
+                    text = statusText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Spacer(modifier = Modifier.height(8.dp))
             if (download.progress > 0) {
                 LinearProgressIndicator(
@@ -321,6 +455,68 @@ private fun DownloadStatusCard(download: ActiveDownload) {
     }
 }
 
+/** Diálogo para elegir playlist y agregar la canción indicada. */
+@Composable
+private fun AddToPlaylistDialog(
+    playlists: List<Playlist>,
+    onDismiss: () -> Unit,
+    onCreateAndAdd: (String) -> Unit,
+    onAddToPlaylist: (Long) -> Unit,
+) {
+    var newName by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.playlist_add)) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    label = { Text(stringResource(R.string.playlist_new)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                TextButton(
+                    onClick = { onCreateAndAdd(newName.trim()) },
+                    enabled = newName.isNotBlank(),
+                    modifier = Modifier.align(Alignment.End),
+                ) {
+                    Text(stringResource(R.string.playlist_add_new_and_add))
+                }
+                if (playlists.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = stringResource(R.string.playlist_existing),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    LazyColumn(modifier = Modifier.heightIn(max = 240.dp)) {
+                        items(playlists, key = { it.id }) { playlist ->
+                            TextButton(
+                                onClick = { onAddToPlaylist(playlist.id) },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(
+                                    text = playlist.name,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textAlign = TextAlign.Start,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        },
+    )
+}
+
 /** Diálogo que pide la URL de un vídeo de YouTube para descargarlo. */
 @Composable
 private fun AddSongDialog(
@@ -328,6 +524,7 @@ private fun AddSongDialog(
     onAdd: (String) -> Unit,
 ) {
     var url by remember { mutableStateOf("") }
+    val isPlaylistUrl = url.trim().contains("list=")
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -335,7 +532,9 @@ private fun AddSongDialog(
         text = {
             Column {
                 Text(
-                    text = stringResource(R.string.add_song_description),
+                    text = stringResource(
+                        if (isPlaylistUrl) R.string.add_playlist_description else R.string.add_song_description,
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Spacer(modifier = Modifier.height(8.dp))

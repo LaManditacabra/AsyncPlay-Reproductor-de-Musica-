@@ -6,6 +6,7 @@ import com.example.musicplayer.data.repository.SongRepository
 import com.example.musicplayer.player.PlaybackController
 import com.example.musicplayer.player.PlaybackPreferences
 import com.example.musicplayer.scraper.NewPipeDownloader
+import com.example.musicplayer.settings.SettingsController
 import com.example.musicplayer.update.UpdateManager
 import java.util.Locale
 import org.schabi.newpipe.extractor.NewPipe
@@ -30,6 +31,9 @@ class MusicPlayerApplication : Application() {
     lateinit var updateManager: UpdateManager
         private set
 
+    lateinit var settings: SettingsController
+        private set
+
     override fun onCreate() {
         super.onCreate()
 
@@ -38,9 +42,10 @@ class MusicPlayerApplication : Application() {
         NewPipe.setupLocalization(Localization.fromLocale(Locale.getDefault()))
 
         val database = AppDatabase.getInstance(this)
-        repository = SongRepository(database.songDao())
+        repository = SongRepository(database.songDao(), database.playlistDao())
         playbackController = PlaybackController(this)
         playbackPreferences = PlaybackPreferences(this)
         updateManager = UpdateManager(this)
+        settings = SettingsController(this)
     }
 }

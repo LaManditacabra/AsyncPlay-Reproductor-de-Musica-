@@ -134,6 +134,7 @@ fun SearchScreen(
                             result = result,
                             onDownload = {
                                 viewModel.download(result)
+                                snackbarHostState.currentSnackbarData?.dismiss()
                                 scope.launch {
                                     snackbarHostState.showSnackbar(queuedMessage)
                                 }

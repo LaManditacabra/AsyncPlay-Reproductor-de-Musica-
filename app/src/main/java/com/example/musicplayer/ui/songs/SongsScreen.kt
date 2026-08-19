@@ -39,6 +39,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -50,6 +51,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -68,6 +70,7 @@ import com.example.musicplayer.ui.player.PlayerScreen
 import com.example.musicplayer.ui.songs.SongsViewModel.ActiveDownload
 import com.example.musicplayer.ui.update.UpdateDialog
 import com.example.musicplayer.update.UpdateManager.UpdateState
+import kotlinx.coroutines.delay
 
 /**
  * Pantalla principal: lista de canciones guardadas consumida desde el
@@ -104,8 +107,27 @@ fun SongsScreen(
     // Muestra los mensajes de descargas/importaciones como snackbar.
     LaunchedEffect(viewModel) {
         viewModel.messages.collect { message ->
-            snackbarHostState.showSnackbar(message)
+            // Descarta cualquier snackbar previo para evitar que se queden colgados.
+            snackbarHostState.currentSnackbarData?.dismiss()
+            snackbarHostState.showSnackbar(
+                message = message,
+                duration = SnackbarDuration.Short,
+            )
         }
+    }
+
+    // Vigilante: si un snackbar se queda en pantalla más de 5 segundos (p. ej.
+    // porque el coroutine que lo mostró fue cancelado), lo cierra a la fuerza.
+    LaunchedEffect(snackbarHostState) {
+        snapshotFlow { snackbarHostState.currentSnackbarData }
+            .collect { data ->
+                if (data != null) {
+                    delay(5_000)
+                    if (snackbarHostState.currentSnackbarData === data) {
+                        data.dismiss()
+                    }
+                }
+            }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {

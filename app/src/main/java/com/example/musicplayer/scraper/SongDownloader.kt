@@ -25,7 +25,7 @@ object SongDownloader {
         repository: SongRepository,
         onProgress: suspend (title: String, percent: Int) -> Unit,
     ): String {
-        val extracted = YouTubeExtractor().extractStream(normalizeUrl(videoUrl))
+        val extracted = YouTubeExtractor().extractStream(normalizeUrl(videoUrl), context)
         onProgress(extracted.title, 0)
         val audioFile = audioFile(context, extracted.videoId, extracted.audioExtension)
         FileDownloader.downloadWithProgress(extracted.audioUrl, audioFile) { percent ->

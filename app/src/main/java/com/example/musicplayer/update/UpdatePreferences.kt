@@ -35,10 +35,18 @@ class UpdatePreferences(context: Context) {
             prefs.edit().putLong(KEY_RATE_LIMIT_RESET, value).apply()
         }
 
+    /** Versión instalada en la última comprobación. Si cambia, se salta el cooldown. */
+    var lastCheckedVersion: String?
+        get() = prefs.getString(KEY_LAST_CHECKED_VERSION, null)
+        set(value) {
+            prefs.edit().putString(KEY_LAST_CHECKED_VERSION, value).apply()
+        }
+
     private companion object {
         const val PREFS_NAME = "update_preferences"
         const val KEY_LAST_CHECK_AT = "last_check_at"
         const val KEY_ETAG = "etag"
         const val KEY_RATE_LIMIT_RESET = "rate_limit_reset_at"
+        const val KEY_LAST_CHECKED_VERSION = "last_checked_version"
     }
 }

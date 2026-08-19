@@ -51,9 +51,8 @@ class UpdateManager(private val context: Context) {
     /**
      * Comprueba si hay una versión más reciente en GitHub.
      *
-     * Para no agotar el rate limit de la API:
-     *  - respeta un cooldown mínimo ([MIN_CHECK_INTERVAL_MS]) entre comprobaciones;
-     *  - usa `If-None-Match`/ETag (304 no consume cuota);
+     * Se ejecuta en cada apertura de la app. Para no agotar el rate limit:
+     *  - usa `If-None-Match`/ETag (las respuestas 304 no consumen cuota);
      *  - si GitHub devuelve 403, no se vuelve a consultar hasta el `X-RateLimit-Reset`.
      *
      * Cualquier fallo (offline, rate-limit, sin releases) vuelve silenciosamente
@@ -95,6 +94,7 @@ class UpdateManager(private val context: Context) {
                         _state.value = UpdateState.Idle
                     }
                 }
+                prefs.lastCheckedVersion = BuildConfig.VERSION_NAME
             } catch (e: Exception) {
                 _state.value = UpdateState.Idle
             }
@@ -102,14 +102,12 @@ class UpdateManager(private val context: Context) {
     }
 
     /**
-     * Devuelve `true` si hay que saltarse la comprobación: o bien se está dentro
-     * del periodo de cooldown, o bien GitHub pidió esperar al reset del rate limit.
+     * Devuelve `true` si hay que saltarse la comprobación. Únicamente cuando
+     * GitHub pidió esperar al reset del rate limit (403). Las consultas
+     * condicionales (304) no consumen cuota, así que se comprueba siempre.
      */
     private fun withinCooldown(): Boolean {
-        val now = System.currentTimeMillis()
-        if (now < prefs.rateLimitResetAt) return true
-        val lastCheck = prefs.lastCheckAt
-        return lastCheck > 0 && now - lastCheck < MIN_CHECK_INTERVAL_MS
+        return System.currentTimeMillis() < prefs.rateLimitResetAt
     }
 
     /** Descarga el APK de la release disponible en segundo plano. */
@@ -183,10 +181,5 @@ class UpdateManager(private val context: Context) {
                 }
             }
         }
-    }
-
-    private companion object {
-        /** Tiempo mínimo entre comprobaciones de actualización. */
-        const val MIN_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1_000L // 6 horas
     }
 }

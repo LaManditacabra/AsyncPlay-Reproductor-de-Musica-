@@ -84,7 +84,8 @@ fun PlayerScreen(
                     Brush.verticalGradient(
                         listOf(
                             MaterialTheme.colorScheme.surface,
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                            MaterialTheme.colorScheme.primaryContainer,
+                            MaterialTheme.colorScheme.tertiaryContainer,
                         ),
                     ),
                 )
@@ -117,7 +118,7 @@ fun PlayerScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Portada grande.
+            // Portada grande (con degradado de marca si no hay imagen).
             AsyncImage(
                 model = song.thumbnailUrl,
                 contentDescription = song.title,
@@ -125,7 +126,14 @@ fun PlayerScreen(
                 modifier = Modifier
                     .size(260.dp)
                     .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                    .background(
+                        Brush.linearGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.primary,
+                                MaterialTheme.colorScheme.tertiary,
+                            ),
+                        ),
+                    ),
             )
 
             Spacer(modifier = Modifier.height(24.dp))

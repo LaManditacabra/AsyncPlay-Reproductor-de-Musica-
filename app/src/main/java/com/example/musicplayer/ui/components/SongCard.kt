@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.MoreVert
@@ -27,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
@@ -50,6 +52,10 @@ import com.example.musicplayer.util.formatDuration
  * @param onToggleFavorite Al pulsar el corazón (marcar/desmarcar favorita).
  * @param onDelete        Al pulsar el botón de eliminar.
  * @param onMore          Si se pasa, muestra el menú ⋮ (p. ej. "Agregar a playlist").
+ * @param isPending       Indica si el archivo de audio no está disponible (p. ej.
+ *                        canción restaurada desde un backup). Se muestra atenuada
+ *                        y con botón de descarga en lugar de reproducción.
+ * @param onRedownload    Al pulsar el botón de descarga de una canción pendiente.
  */
 @Composable
 fun SongCard(
@@ -62,6 +68,8 @@ fun SongCard(
     onDelete: () -> Unit,
     onMore: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    isPending: Boolean = false,
+    onRedownload: (() -> Unit)? = null,
 ) {
     ElevatedCard(
         modifier = modifier
@@ -96,8 +104,13 @@ fun SongCard(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Información textual de la canción.
-            Column(modifier = Modifier.weight(1f)) {
+            // Información textual de la canción. Las pendientes se muestran
+            // atenuadas para indicar que aún no se pueden reproducir.
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .alpha(if (isPending) 0.55f else 1f),
+            ) {
                 Text(
                     text = song.title,
                     style = MaterialTheme.typography.titleMedium,
@@ -112,25 +125,43 @@ fun SongCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = formatDuration(song.durationMs),
+                    text = if (isPending) {
+                        stringResource(R.string.song_pending)
+                    } else {
+                        formatDuration(song.durationMs)
+                    },
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (isPending) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
                 )
             }
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Botón de reproducción: play si no es la actual, play/pausa si lo es.
-            FilledIconButton(onClick = onPlayPause) {
-                val playingThis = isCurrentSong && isPlaying
-                Icon(
-                    imageVector = if (playingThis) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (playingThis) {
-                        stringResource(R.string.action_pause)
-                    } else {
-                        stringResource(R.string.action_play)
-                    },
-                )
+            if (isPending && onRedownload != null) {
+                // Sin archivo local: el botón lanza la re-descarga desde YouTube.
+                FilledIconButton(onClick = onRedownload) {
+                    Icon(
+                        imageVector = Icons.Filled.Download,
+                        contentDescription = stringResource(R.string.action_redownload),
+                    )
+                }
+            } else {
+                // Botón de reproducción: play si no es la actual, play/pausa si lo es.
+                FilledIconButton(onClick = onPlayPause) {
+                    val playingThis = isCurrentSong && isPlaying
+                    Icon(
+                        imageVector = if (playingThis) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = if (playingThis) {
+                            stringResource(R.string.action_pause)
+                        } else {
+                            stringResource(R.string.action_play)
+                        },
+                    )
+                }
             }
 
             // Corazón de favorito.

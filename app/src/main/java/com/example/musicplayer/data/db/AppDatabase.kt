@@ -17,7 +17,7 @@ import com.example.musicplayer.data.model.Song
  */
 @Database(
     entities = [Song::class, Playlist::class, PlaylistSong::class],
-    version = 3,
+    version = 4,
     exportSchema = false, // Desactivado para mantener el scaffold simple; en producción se exporta el esquema.
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -66,6 +66,17 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Migración 3 -> 4: añade la columna `youtube_url` a la tabla `songs`
+         * (las canciones existentes quedan sin URL hasta que se vuelvan a
+         * descargar).
+         */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE songs ADD COLUMN youtube_url TEXT")
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -81,7 +92,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     DATABASE_NAME,
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                     .also { INSTANCE = it }
             }

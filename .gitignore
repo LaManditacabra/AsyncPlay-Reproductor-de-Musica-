@@ -12,3 +12,5 @@
 # Credenciales de firma (no subir al repo)
 /keystore.properties
 /keystore/
+# Config local de opencode (contiene la clave MCP de Penpot)
+/opencode.json

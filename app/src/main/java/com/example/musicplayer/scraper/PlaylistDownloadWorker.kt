@@ -33,6 +33,7 @@ class PlaylistDownloadWorker(
 
     override suspend fun doWork(): Result {
         val playlistUrl = inputData.getString(KEY_PLAYLIST_URL) ?: return Result.failure()
+        val playlistName = inputData.getString(KEY_PLAYLIST_NAME)?.trim()
         return try {
             setProgress(
                 workDataOf(DownloadWorker.KEY_STATUS to DownloadWorker.STATUS_PLAYLIST_EXTRACTING),
@@ -42,6 +43,15 @@ class PlaylistDownloadWorker(
                 return Result.failure(
                     workDataOf(DownloadWorker.KEY_ERROR to "La playlist no tiene vídeos"),
                 )
+            }
+
+            // Si el usuario pidió crear una playlist, la creamos (o reutilizamos
+            // la existente con el mismo nombre) y agregamos cada canción al terminar.
+            val playlistId = if (playlistName.isNullOrEmpty()) {
+                null
+            } else {
+                repository.findPlaylistByName(playlistName)?.id
+                    ?: repository.createPlaylist(playlistName)
             }
 
             val total = videos.size
@@ -54,7 +64,7 @@ class PlaylistDownloadWorker(
                         DownloadWorker.KEY_TOTAL to total,
                     ),
                 )
-                SongDownloader.downloadOne(
+                val song = SongDownloader.downloadOne(
                     context = applicationContext,
                     videoUrl = videoUrl,
                     repository = repository,
@@ -69,6 +79,7 @@ class PlaylistDownloadWorker(
                         ),
                     )
                 }
+                playlistId?.let { repository.addSongToPlaylist(it, song.id) }
                 done++
             }
 
@@ -101,18 +112,22 @@ class PlaylistDownloadWorker(
     companion object {
         private const val TAG = "youtube_playlist_download"
         const val KEY_PLAYLIST_URL = "playlist_url"
+        const val KEY_PLAYLIST_NAME = "playlist_name"
         const val MAX_VIDEOS = 100
 
         /**
-         * Encola la descarga de una playlist completa. Usa el mismo tag que
+         * Encola la descarga de una playlist completa. Si se indica
+         * [playlistName], las canciones descargadas se agregan a una playlist
+         * con ese nombre (creada si no existe). Usa el mismo tag que
          * [DownloadWorker] para que la UI las muestre juntas.
          */
-        fun start(context: Context, playlistUrl: String) {
+        fun start(context: Context, playlistUrl: String, playlistName: String? = null) {
             val request = OneTimeWorkRequestBuilder<PlaylistDownloadWorker>()
                 .addTag(DownloadWorker.TAG)
                 .setInputData(
                     workDataOf(
                         KEY_PLAYLIST_URL to playlistUrl,
+                        KEY_PLAYLIST_NAME to playlistName,
                         DownloadWorker.KEY_TYPE to DownloadWorker.TYPE_PLAYLIST,
                     ),
                 )

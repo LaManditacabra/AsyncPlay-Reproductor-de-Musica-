@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -74,6 +75,7 @@ fun SearchScreen(
     val scope = rememberCoroutineScope()
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.search_title)) },
@@ -121,7 +123,7 @@ fun SearchScreen(
             when (val state = uiState) {
                 is SearchUiState.Idle -> SearchHint()
                 is SearchUiState.Loading -> LoadingState()
-                is SearchUiState.Error -> MessageState(stringResource(R.string.search_error))
+                is SearchUiState.Error -> MessageState(stringResource(R.string.search_error, state.message))
                 is SearchUiState.NoResults -> MessageState(stringResource(R.string.search_no_results, state.query))
                 is SearchUiState.Results -> LazyColumn(
                     modifier = Modifier.fillMaxSize(),

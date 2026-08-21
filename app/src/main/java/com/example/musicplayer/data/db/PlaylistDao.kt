@@ -7,6 +7,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.example.musicplayer.data.model.Playlist
 import com.example.musicplayer.data.model.PlaylistSong
+import com.example.musicplayer.data.model.PlaylistThumb
 import com.example.musicplayer.data.model.PlaylistWithCount
 import com.example.musicplayer.data.model.Song
 import kotlinx.coroutines.flow.Flow
@@ -37,6 +38,10 @@ interface PlaylistDao {
     @Query("SELECT * FROM playlists WHERE id = :playlistId")
     fun observePlaylist(playlistId: Long): Flow<Playlist?>
 
+    /** Busca una playlist por nombre exacto (para reutilizarla al descargar). */
+    @Query("SELECT * FROM playlists WHERE name = :name LIMIT 1")
+    suspend fun findByName(name: String): Playlist?
+
     /** Canciones de una playlist, en el orden de [PlaylistSong.position]. */
     @Query(
         """
@@ -47,6 +52,20 @@ interface PlaylistDao {
         """,
     )
     fun observePlaylistSongs(playlistId: Long): Flow<List<Song>>
+
+    /**
+     * Miniaturas de las canciones de todas las playlists, en su orden. La UI
+     * agrupa por playlist y se queda con las primeras (collage 2x2).
+     */
+    @Query(
+        """
+        SELECT ps.playlist_id AS playlist_id, s.thumbnail_url AS thumbnail_url
+        FROM playlist_songs ps
+        INNER JOIN songs s ON s.id = ps.song_id
+        ORDER BY ps.playlist_id ASC, ps.position ASC
+        """,
+    )
+    fun observePlaylistThumbs(): Flow<List<PlaylistThumb>>
 
     @Insert
     suspend fun insertPlaylist(playlist: Playlist): Long

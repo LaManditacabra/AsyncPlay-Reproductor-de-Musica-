@@ -5,8 +5,6 @@
     <string name="songs_title">Mi Música</string>
     <string name="songs_add">Añadir canción</string>
     <string name="songs_empty">Aún no hay canciones.\nPulsa el botón + para añadir desde YouTube.</string>
-    <string name="songs_show_all">Todas</string>
-    <string name="songs_show_favorites">Favoritas</string>
     <string name="library_search_hint">Buscar en tu música…</string>
     <string name="action_clear_search">Borrar búsqueda</string>
     <string name="sort_label">Ordenar</string>
@@ -21,6 +19,9 @@
     <string name="action_favorite">Marcar como favorita</string>
     <string name="action_unfavorite">Quitar de favoritas</string>
     <string name="action_delete">Eliminar</string>
+    <string name="song_pending">Pendiente de descargar</string>
+    <string name="action_redownload">Volver a descargar</string>
+    <string name="redownload_no_url">Esta canción no tiene URL de YouTube guardada; bórrala y añádela de nuevo.</string>
 
     <!-- Diálogo de añadir desde YouTube -->
     <string name="add_song_title">Añadir desde YouTube</string>
@@ -48,14 +49,8 @@
     <string name="search_loading">Buscando…</string>
     <string name="search_empty">Escribe algo para buscar en YouTube.</string>
     <string name="search_no_results">Sin resultados para “%1$s”.</string>
-    <string name="search_error">No se pudo realizar la búsqueda.</string>
+    <string name="search_error">No se pudo realizar la búsqueda: %1$s</string>
     <string name="search_download_queued">Descarga iniciada</string>
-
-    <!-- Importar música local -->
-    <string name="import_songs">Importar música</string>
-    <string name="import_success">Importadas %1$d canción(es)</string>
-    <string name="import_failed">No se pudo importar la música</string>
-    <string name="local_artist">Archivo local</string>
 
     <!-- Descargas -->
     <string name="download_added">Canción añadida: %1$s</string>
@@ -68,6 +63,7 @@
     <string name="playlist_download_progress">Canción %1$d de %2$d</string>
     <string name="playlist_downloaded">Playlist descargada: %1$d canción(es)</string>
     <string name="add_playlist_description">Pega la URL de una playlist. Se descargarán todas sus canciones en segundo plano.</string>
+    <string name="add_playlist_create_option">Crear playlist con estas canciones</string>
 
     <!-- Actualizaciones -->
     <string name="update_available_title">Nueva versión disponible</string>
@@ -84,6 +80,12 @@
 
     <!-- Playlists -->
     <string name="playlist_title">Playlists</string>
+    <string name="library_title">Mi Biblioteca</string>
+    <string name="library_filter_all">Todas</string>
+    <string name="library_filter_playlists">Playlists</string>
+    <string name="library_sort_recent">Más recientes</string>
+    <string name="library_sort_name">Nombre</string>
+    <string name="playlist_options">Opciones</string>
     <string name="playlist_new">Nueva playlist</string>
     <string name="playlist_name_label">Nombre de la playlist</string>
     <string name="playlist_create">Crear</string>
@@ -97,12 +99,46 @@
     <string name="playlist_already_in">Ya está en %1$s</string>
     <string name="playlist_delete_confirm_title">Eliminar playlist</string>
     <string name="playlist_delete_confirm_message">¿Eliminar “%1$s”? Las canciones no se borrarán.</string>
+
+    <!-- Favoritos -->
+    <string name="favorites_title">Favoritos</string>
+    <string name="favorites_empty">Todavía no hay favoritas.\nToca el corazón en una canción para guardarla aquí.</string>
     <string name="action_back">Volver</string>
+
+    <!-- Navegación inferior -->
+    <string name="nav_songs">Canciones</string>
+    <string name="nav_library">Mi Biblioteca</string>
+    <string name="nav_profile">Perfil</string>
+
+    <!-- Perfil -->
+    <string name="profile_title">Perfil</string>
+    <string name="profile_version">Versión %1$s</string>
+    <string name="profile_section_general">General</string>
+    <string name="profile_section_backup">Copia de seguridad</string>
+    <string name="profile_settings_subtitle">Tema de la app</string>
+    <string name="profile_check_updates">Buscar actualizaciones</string>
+    <string name="profile_check_updates_subtitle">Comprueba si hay una versión nueva en GitHub</string>
+    <string name="profile_export_backup">Exportar backup</string>
+    <string name="profile_export_backup_subtitle">Guarda canciones (con su URL) y playlists en un archivo JSON</string>
+    <string name="profile_import_backup">Importar backup</string>
+    <string name="profile_import_backup_subtitle">Restaura canciones y playlists desde un archivo JSON</string>
+
+    <!-- Backup -->
+    <string name="backup_result_title">Backup</string>
+    <string name="backup_working_title">Procesando…</string>
+    <string name="backup_working_body">Estamos preparando tu copia de seguridad.</string>
+    <string name="backup_export_done">Backup exportado correctamente.</string>
+    <string name="backup_import_done">Backup importado: %1$d canciones y %2$d playlists nuevas.</string>
+    <string name="backup_import_pending">%1$d canciones quedaron pendientes de descargar: búscalas con la lupa y descárgalas para completarlas.</string>
+    <string name="backup_error">No se pudo procesar el backup: %1$s</string>
+    <string name="action_ok">Aceptar</string>
 
     <!-- Ajustes -->
     <string name="settings_title">Ajustes</string>
-    <string name="settings_theme_label">Tema</string>
-    <string name="settings_theme_system">Automático</string>
-    <string name="settings_theme_light">Claro</string>
-    <string name="settings_theme_dark">Oscuro</string>
+    <string name="settings_section_appearance">Apariencia</string>
+    <string name="settings_dark_mode_title">Modo oscuro</string>
+    <string name="settings_dark_mode_subtitle">Usa el tema oscuro en toda la app</string>
+    <string name="settings_section_downloads">Descargas</string>
+    <string name="settings_auto_download_title">Descargar pendientes automáticamente</string>
+    <string name="settings_auto_download_subtitle">Al importar un backup, las canciones sin audio se descargan solas desde YouTube</string>
 </resources>

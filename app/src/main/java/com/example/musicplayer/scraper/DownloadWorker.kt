@@ -38,7 +38,7 @@ class DownloadWorker(
             setProgress(workDataOf(KEY_STATUS to STATUS_EXTRACTING))
 
             // 2) Descarga del audio, portada y persistencia (lógica compartida).
-            val title = SongDownloader.downloadOne(
+            val song = SongDownloader.downloadOne(
                 context = applicationContext,
                 videoUrl = videoUrl,
                 repository = repository,
@@ -53,7 +53,7 @@ class DownloadWorker(
             }
 
             // 3) Éxito: reporta el título para que la UI lo muestre.
-            Result.success(workDataOf(KEY_SONG_TITLE to title, KEY_TYPE to TYPE_SINGLE))
+            Result.success(workDataOf(KEY_SONG_TITLE to song.title, KEY_TYPE to TYPE_SINGLE))
         } catch (e: Exception) {
             android.util.Log.e(TAG, "Fallo descargando $videoUrl", e)
             Result.failure(workDataOf(KEY_ERROR to (e.message ?: e.javaClass.simpleName)))

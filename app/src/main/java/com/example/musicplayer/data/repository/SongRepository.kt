@@ -4,6 +4,7 @@ import com.example.musicplayer.data.db.PlaylistDao
 import com.example.musicplayer.data.db.SongDao
 import com.example.musicplayer.data.model.Playlist
 import com.example.musicplayer.data.model.PlaylistSong
+import com.example.musicplayer.data.model.PlaylistThumb
 import com.example.musicplayer.data.model.PlaylistWithCount
 import com.example.musicplayer.data.model.Song
 import kotlinx.coroutines.flow.Flow
@@ -33,6 +34,16 @@ class SongRepository(
     suspend fun setFavorite(songId: Long, favorite: Boolean) =
         songDao.setFavorite(songId, favorite)
 
+    /** Busca una canción por su URL de YouTube (o null si no existe). */
+    suspend fun findSongByUrl(url: String): Song? = songDao.findByUrl(url)
+
+    /** Busca una canción por título y artista exactos (o null si no existe). */
+    suspend fun findSongByTitleAndArtist(title: String, artist: String): Song? =
+        songDao.findByTitleAndArtist(title, artist)
+
+    /** Reemplaza una canción existente (mismo id). */
+    suspend fun updateSong(song: Song) = songDao.update(song)
+
     // ------------------------------------------------------------------
     // Playlists
     // ------------------------------------------------------------------
@@ -49,6 +60,10 @@ class SongRepository(
     fun playlist(playlistId: Long): Flow<Playlist?> =
         playlistDao.observePlaylist(playlistId)
 
+    /** Flujo reactivo de las miniaturas de todas las playlists (para las tarjetas). */
+    fun playlistThumbs(): Flow<List<PlaylistThumb>> =
+        playlistDao.observePlaylistThumbs()
+
     /** Flujo reactivo de las canciones de una playlist, en orden. */
     fun playlistSongs(playlistId: Long): Flow<List<Song>> =
         playlistDao.observePlaylistSongs(playlistId)
@@ -56,6 +71,10 @@ class SongRepository(
     /** Crea una playlist y devuelve su id. */
     suspend fun createPlaylist(name: String): Long =
         playlistDao.insertPlaylist(Playlist(name = name))
+
+    /** Busca una playlist existente por nombre exacto (o null si no existe). */
+    suspend fun findPlaylistByName(name: String): Playlist? =
+        playlistDao.findByName(name)
 
     /** Borra una playlist (y sus relaciones), sin tocar los archivos de audio. */
     suspend fun deletePlaylist(playlist: Playlist) {

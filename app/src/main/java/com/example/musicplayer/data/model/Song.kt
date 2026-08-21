@@ -36,12 +36,23 @@ data class Song(
     @ColumnInfo(name = "thumbnail_url")
     val thumbnailUrl: String? = null,
 
+    /** URL de YouTube de origen (para backups y re-descargas), o `null` si se
+     * importó sin ella. */
+    @ColumnInfo(name = "youtube_url")
+    val youtubeUrl: String? = null,
+
     @ColumnInfo(name = "is_favorite")
     val isFavorite: Boolean = false,
 ) {
 
     /** Devuelve la [Uri] local del archivo de audio, lista para ExoPlayer. */
     fun toUri(): Uri = Uri.fromFile(File(localPath))
+
+    /**
+     * Indica si el audio no está disponible localmente (canción importada por
+     * backup o con el archivo borrado): no se puede reproducir hasta re-descargar.
+     */
+    fun isPending(): Boolean = localPath.isBlank() || !File(localPath).exists()
 
     /** Copia con el estado de favorito actualizado. */
     fun withFavorite(favorite: Boolean): Song = copy(isFavorite = favorite)

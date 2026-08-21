@@ -1,17 +1,15 @@
 package com.example.musicplayer.ui.songs
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,10 +18,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sort
@@ -42,6 +36,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -61,9 +56,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.musicplayer.R
-import com.example.musicplayer.data.model.Playlist
 import com.example.musicplayer.data.model.Song
 import com.example.musicplayer.scraper.DownloadWorker
+import com.example.musicplayer.ui.components.AddToPlaylistDialog
 import com.example.musicplayer.ui.components.MiniPlayerBar
 import com.example.musicplayer.ui.components.SongCard
 import com.example.musicplayer.ui.player.PlayerScreen
@@ -81,12 +76,10 @@ import kotlinx.coroutines.delay
 @Composable
 fun SongsScreen(
     onNavigateToSearch: () -> Unit,
-    onNavigateToPlaylists: () -> Unit,
     onNavigateToSettings: () -> Unit,
     viewModel: SongsViewModel = viewModel(),
 ) {
     val songs by viewModel.songs.collectAsStateWithLifecycle()
-    val favoritesOnly by viewModel.favoritesOnly.collectAsStateWithLifecycle()
     val playerState by viewModel.playerState.collectAsStateWithLifecycle()
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     val activeDownloads by viewModel.activeDownloads.collectAsStateWithLifecycle()
@@ -100,9 +93,6 @@ fun SongsScreen(
     var showPlayer by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
-    val importLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenMultipleDocuments(),
-    ) { uris -> viewModel.importSongs(uris) }
 
     // Muestra los mensajes de descargas/importaciones como snackbar.
     LaunchedEffect(viewModel) {
@@ -132,40 +122,11 @@ fun SongsScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
             topBar = {
                 TopAppBar(
                     title = { Text(stringResource(R.string.songs_title)) },
                     actions = {
-                        // Filtro de favoritas.
-                        IconButton(onClick = viewModel::toggleFavoritesFilter) {
-                            Icon(
-                                imageVector = if (favoritesOnly) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                                contentDescription = stringResource(
-                                    if (favoritesOnly) R.string.songs_show_favorites else R.string.songs_show_all,
-                                ),
-                                tint = if (favoritesOnly) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                            )
-                        }
-                        // Importar música local (SAF, sin permisos de almacenamiento).
-                        IconButton(onClick = {
-                            importLauncher.launch(arrayOf("audio/*"))
-                        }) {
-                            Icon(
-                                Icons.Filled.FolderOpen,
-                                contentDescription = stringResource(R.string.import_songs),
-                            )
-                        }
-                        // Playlists.
-                        IconButton(onClick = onNavigateToPlaylists) {
-                            Icon(
-                                imageVector = Icons.Filled.PlaylistPlay,
-                                contentDescription = stringResource(R.string.playlist_title),
-                            )
-                        }
                         // Ajustes.
                         IconButton(onClick = onNavigateToSettings) {
                             Icon(
@@ -184,6 +145,23 @@ fun SongsScreen(
                 )
             },
             snackbarHost = { SnackbarHost(snackbarHostState) },
+            // Mini reproductor como bottomBar: el FAB flota encima y la lista
+            // respeta su espacio vía innerPadding (sin solapes).
+            bottomBar = {
+                playerState.currentSong?.let { song ->
+                    MiniPlayerBar(
+                        song = song,
+                        isPlaying = playerState.isPlaying,
+                        progress = if (playerState.durationMs > 0) {
+                            playerState.positionMs.toFloat() / playerState.durationMs
+                        } else {
+                            0f
+                        },
+                        onClick = { showPlayer = true },
+                        onPlayPause = viewModel::togglePlayPause,
+                    )
+                }
+            },
             floatingActionButton = {
                 FloatingActionButton(onClick = { showAddDialog = true }) {
                     Icon(
@@ -301,24 +279,11 @@ fun SongsScreen(
                                 onToggleFavorite = { viewModel.toggleFavorite(song) },
                                 onDelete = { songToDelete = song },
                                 onMore = { songForPlaylist = song },
+                                isPending = viewModel.isPending(song),
+                                onRedownload = { viewModel.redownloadSong(song) },
                             )
                         }
                     }
-                }
-
-                // Barra de reproducción en miniatura mientras haya canción cargada.
-                playerState.currentSong?.let { song ->
-                    MiniPlayerBar(
-                        song = song,
-                        isPlaying = playerState.isPlaying,
-                        progress = if (playerState.durationMs > 0) {
-                            playerState.positionMs.toFloat() / playerState.durationMs
-                        } else {
-                            0f
-                        },
-                        onClick = { showPlayer = true },
-                        onPlayPause = viewModel::togglePlayPause,
-                    )
                 }
             }
         }
@@ -343,8 +308,8 @@ fun SongsScreen(
     if (showAddDialog) {
         AddSongDialog(
             onDismiss = { showAddDialog = false },
-            onAdd = { url ->
-                viewModel.downloadFromUrl(url)
+            onAdd = { url, playlistName ->
+                viewModel.downloadFromUrl(url, playlistName)
                 showAddDialog = false
             },
         )
@@ -477,75 +442,16 @@ private fun DownloadStatusCard(download: ActiveDownload) {
     }
 }
 
-/** Diálogo para elegir playlist y agregar la canción indicada. */
-@Composable
-private fun AddToPlaylistDialog(
-    playlists: List<Playlist>,
-    onDismiss: () -> Unit,
-    onCreateAndAdd: (String) -> Unit,
-    onAddToPlaylist: (Long) -> Unit,
-) {
-    var newName by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.playlist_add)) },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = newName,
-                    onValueChange = { newName = it },
-                    label = { Text(stringResource(R.string.playlist_new)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                TextButton(
-                    onClick = { onCreateAndAdd(newName.trim()) },
-                    enabled = newName.isNotBlank(),
-                    modifier = Modifier.align(Alignment.End),
-                ) {
-                    Text(stringResource(R.string.playlist_add_new_and_add))
-                }
-                if (playlists.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = stringResource(R.string.playlist_existing),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    LazyColumn(modifier = Modifier.heightIn(max = 240.dp)) {
-                        items(playlists, key = { it.id }) { playlist ->
-                            TextButton(
-                                onClick = { onAddToPlaylist(playlist.id) },
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Text(
-                                    text = playlist.name,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    textAlign = TextAlign.Start,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
-            }
-        },
-    )
-}
-
-/** Diálogo que pide la URL de un vídeo de YouTube para descargarlo. */
+/** Diálogo que pide la URL de un vídeo/playlist de YouTube. Si es playlist,
+ * ofrece crear una playlist con un nombre para agrupar las canciones descargadas. */
 @Composable
 private fun AddSongDialog(
     onDismiss: () -> Unit,
-    onAdd: (String) -> Unit,
+    onAdd: (url: String, playlistName: String?) -> Unit,
 ) {
     var url by remember { mutableStateOf("") }
+    var createPlaylist by remember { mutableStateOf(false) }
+    var playlistName by remember { mutableStateOf("") }
     val isPlaylistUrl = url.trim().contains("list=")
 
     AlertDialog(
@@ -567,12 +473,44 @@ private fun AddSongDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                if (isPlaylistUrl) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Switch(
+                            checked = createPlaylist,
+                            onCheckedChange = { createPlaylist = it },
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(R.string.add_playlist_create_option),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                    if (createPlaylist) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = playlistName,
+                            onValueChange = { playlistName = it },
+                            label = { Text(stringResource(R.string.playlist_name_label)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onAdd(url.trim()) },
-                enabled = url.isNotBlank(),
+                onClick = {
+                    onAdd(
+                        url.trim(),
+                        if (createPlaylist) playlistName.trim().ifEmpty { null } else null,
+                    )
+                },
+                enabled = url.isNotBlank() && (!createPlaylist || playlistName.isNotBlank()),
             ) {
                 Text(stringResource(R.string.action_download))
             }

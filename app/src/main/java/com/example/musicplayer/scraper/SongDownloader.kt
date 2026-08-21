@@ -17,15 +17,16 @@ object SongDownloader {
      * Descarga y persiste la canción del vídeo [videoUrl].
      *
      * @param onProgress callback con el título de la canción y el porcentaje (0-100).
-     * @return el título de la canción guardada.
+     * @return la [Song] guardada (con su id asignado por Room).
      */
     suspend fun downloadOne(
         context: Context,
         videoUrl: String,
         repository: SongRepository,
         onProgress: suspend (title: String, percent: Int) -> Unit,
-    ): String {
-        val extracted = YouTubeExtractor().extractStream(normalizeUrl(videoUrl), context)
+    ): Song {
+        val normalizedUrl = normalizeUrl(videoUrl)
+        val extracted = YouTubeExtractor().extractStream(normalizedUrl, context)
         onProgress(extracted.title, 0)
         val audioFile = audioFile(context, extracted.videoId, extracted.audioExtension)
         FileDownloader.downloadWithProgress(extracted.audioUrl, audioFile) { percent ->
@@ -40,16 +41,26 @@ object SongDownloader {
                 null
             }
         }
-        repository.addSong(
-            Song(
-                title = extracted.title,
-                artist = extracted.artist,
-                durationMs = extracted.durationSeconds * 1_000,
-                localPath = audioFile.absolutePath,
-                thumbnailUrl = artworkPath,
-            ),
+        // Si la canción ya existía (misma URL de YouTube), se actualiza esa fila
+        // en lugar de insertar un duplicado: conserva id, favorito y playlists.
+        val existing = repository.findSongByUrl(normalizedUrl)
+        val song = Song(
+            id = existing?.id ?: 0L,
+            title = extracted.title,
+            artist = extracted.artist,
+            durationMs = extracted.durationSeconds * 1_000,
+            localPath = audioFile.absolutePath,
+            thumbnailUrl = artworkPath ?: existing?.thumbnailUrl,
+            youtubeUrl = normalizedUrl,
+            isFavorite = existing?.isFavorite ?: false,
         )
-        return extracted.title
+        val id = if (existing != null) {
+            repository.updateSong(song)
+            existing.id
+        } else {
+            repository.addSong(song)
+        }
+        return song.copy(id = id)
     }
 
     /** Convierte `youtu.be/<id>` en `https://www.youtube.com/watch?v=<id>`. */

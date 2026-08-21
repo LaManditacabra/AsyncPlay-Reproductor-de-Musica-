@@ -33,4 +33,16 @@ interface SongDao {
     /** Marca o desmarca una canción como favorita. */
     @Query("UPDATE songs SET is_favorite = :favorite WHERE id = :songId")
     suspend fun setFavorite(songId: Long, favorite: Boolean)
+
+    /** Busca una canción por su URL de YouTube (o null si no existe). */
+    @Query("SELECT * FROM songs WHERE youtube_url = :url LIMIT 1")
+    suspend fun findByUrl(url: String): Song?
+
+    /** Busca una canción por título y artista exactos (o null si no existe). */
+    @Query("SELECT * FROM songs WHERE title = :title AND artist = :artist LIMIT 1")
+    suspend fun findByTitleAndArtist(title: String, artist: String): Song?
+
+    /** Reemplaza una canción existente (mismo id). */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun update(song: Song)
 }

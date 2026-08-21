@@ -52,3 +52,12 @@ data class PlaylistWithCount(
     @ColumnInfo(name = "song_count")
     val songCount: Int,
 )
+
+/** Miniatura de una canción perteneciente a una playlist (para la tarjeta de collage). */
+data class PlaylistThumb(
+    @ColumnInfo(name = "playlist_id")
+    val playlistId: Long,
+
+    @ColumnInfo(name = "thumbnail_url")
+    val thumbnailUrl: String?,
+)

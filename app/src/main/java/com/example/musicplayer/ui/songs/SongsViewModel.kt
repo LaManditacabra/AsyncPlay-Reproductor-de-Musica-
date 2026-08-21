@@ -1,9 +1,6 @@
 package com.example.musicplayer.ui.songs
 
 import android.app.Application
-import android.media.MediaMetadataRetriever
-import android.net.Uri
-import android.provider.OpenableColumns
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
@@ -17,8 +14,6 @@ import com.example.musicplayer.scraper.DownloadWorker
 import com.example.musicplayer.scraper.PlaylistDownloadWorker
 import com.example.musicplayer.update.UpdateManager
 import java.io.File
-import java.io.IOException
-import java.util.UUID
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,10 +44,6 @@ class SongsViewModel(application: Application) : AndroidViewModel(application) {
     private val playbackController = app.playbackController
     private val updateManager = app.updateManager
 
-    /** Permite filtrar la lista mostrando solo favoritas. */
-    private val _favoritesOnly = MutableStateFlow(false)
-    val favoritesOnly: StateFlow<Boolean> = _favoritesOnly.asStateFlow()
-
     /** Criterio de ordenación de la biblioteca. */
     private val _sortMode = MutableStateFlow(SortMode.TITLE)
     val sortMode: StateFlow<SortMode> = _sortMode.asStateFlow()
@@ -61,11 +52,11 @@ class SongsViewModel(application: Application) : AndroidViewModel(application) {
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    /** Lista reactiva de canciones (filtrable por favoritas, orden y búsqueda). */
+    /** Lista reactiva de canciones (filtrable por orden y búsqueda). */
     val songs: StateFlow<List<Song>> =
-        combine(_favoritesOnly, _sortMode, _searchQuery) { fav, sort, q -> Triple(fav, sort, q) }
-            .flatMapLatest { (fav, sort, q) ->
-                repository.songs(fav).map { list ->
+        combine(_sortMode, _searchQuery) { sort, q -> Pair(sort, q) }
+            .flatMapLatest { (sort, q) ->
+                repository.songs().map { list ->
                     val filtered = if (q.isBlank()) {
                         list
                     } else {
@@ -123,8 +114,6 @@ class SongsViewModel(application: Application) : AndroidViewModel(application) {
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    private val seenDownloadIds = mutableSetOf<UUID>()
-
     init {
         // Comprueba actualizaciones al abrir la app.
         viewModelScope.launch { updateManager.checkForUpdates() }
@@ -132,11 +121,6 @@ class SongsViewModel(application: Application) : AndroidViewModel(application) {
         restoreLastSession()
         // Observa el resultado de las descargas en segundo plano.
         observeDownloadResults()
-    }
-
-    /** Alterna el filtro de favoritas. */
-    fun toggleFavoritesFilter() {
-        _favoritesOnly.value = !_favoritesOnly.value
     }
 
     fun setSortMode(mode: SortMode) {
@@ -150,13 +134,38 @@ class SongsViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * Reproduce la canción tocada y encola el resto como playlist,
      * empezando por la posición de la canción seleccionada.
+     *
+     * Si la canción no tiene archivo local (p. ej. restaurada desde un backup),
+     * en su lugar lanza la re-descarga desde YouTube.
      */
     fun onSongClick(song: Song) {
-        val currentSongs = songs.value
-        val index = currentSongs.indexOfFirst { it.id == song.id }
-        if (index >= 0) {
-            playbackController.play(currentSongs, index)
+        if (isPending(song)) {
+            redownloadSong(song)
+            return
         }
+        // La cola solo incluye canciones con audio disponible, para que un
+        // archivo faltante no interrumpa la reproducción al saltar de tema.
+        val playable = songs.value.filter { !isPending(it) }
+        val index = playable.indexOfFirst { it.id == song.id }
+        if (index >= 0) {
+            playbackController.play(playable, index)
+        }
+    }
+
+    /**
+     * Indica si la canción está "pendiente": sin archivo de audio local
+     * (importada por backup) o con el archivo borrado del disco.
+     */
+    fun isPending(song: Song): Boolean = song.isPending()
+
+    /** Vuelve a descargar una canción pendiente usando su URL guardada. */
+    fun redownloadSong(song: Song) {
+        val url = song.youtubeUrl
+        if (url.isNullOrBlank()) {
+            _messages.tryEmit(app.getString(R.string.redownload_no_url))
+            return
+        }
+        DownloadWorker.start(getApplication(), url)
     }
 
     /** Pausa o reanuda la reproducción actual. */
@@ -230,84 +239,21 @@ class SongsViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Lanza la descarga de un vídeo o una playlist de YouTube en segundo plano
-     * (WorkManager). Las URLs con `list=` se tratan como playlist completa.
+     * (WorkManager). Las URLs con `list=` se tratan como playlist completa; si se
+     * indica [playlistName], las canciones descargadas se agregan a una playlist
+     * con ese nombre (creada si no existe).
      */
-    fun downloadFromUrl(url: String) {
+    fun downloadFromUrl(url: String, playlistName: String? = null) {
         val trimmed = url.trim()
         if (trimmed.isEmpty()) return
         if (isPlaylistUrl(trimmed)) {
-            PlaylistDownloadWorker.start(getApplication(), trimmed)
+            PlaylistDownloadWorker.start(getApplication(), trimmed, playlistName)
         } else {
             DownloadWorker.start(getApplication(), trimmed)
         }
     }
 
     private fun isPlaylistUrl(url: String): Boolean = url.contains("list=")
-
-    /**
-     * Importa audios elegidos por el usuario (SAF, sin permisos de almacenamiento):
-     * los copia a la carpeta privada de la app y los añade a la biblioteca.
-     */
-    fun importSongs(uris: List<Uri>) {
-        if (uris.isEmpty()) return
-        viewModelScope.launch {
-            var imported = 0
-            for (uri in uris) {
-                val ok = try {
-                    importOne(uri)
-                    true
-                } catch (e: Exception) {
-                    false
-                }
-                if (ok) imported++
-            }
-            _messages.tryEmit(
-                if (imported > 0) {
-                    app.getString(R.string.import_success, imported)
-                } else {
-                    app.getString(R.string.import_failed)
-                },
-            )
-        }
-    }
-
-    private suspend fun importOne(uri: Uri) {
-        val resolver = app.contentResolver
-        val displayName = resolver.query(uri, null, null, null, null)?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                cursor.getString(cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
-            } else {
-                null
-            }
-        } ?: uri.lastPathSegment ?: "cancion"
-
-        // Copia a filesDir/music/imported/<nombre original>.
-        val file = File(app.filesDir, "$IMPORT_DIR/$displayName")
-        file.parentFile?.mkdirs()
-        val input = resolver.openInputStream(uri) ?: throw IOException("No se pudo leer el archivo")
-        input.use { source -> file.outputStream().use { target -> source.copyTo(target) } }
-
-        repository.addSong(
-            Song(
-                title = displayName.substringBeforeLast('.'),
-                artist = app.getString(R.string.local_artist),
-                durationMs = readDuration(file),
-                localPath = file.absolutePath,
-                thumbnailUrl = null,
-            ),
-        )
-    }
-
-    /** Lee la duración de un archivo local (best-effort; 0 si no se puede). */
-    private fun readDuration(file: File): Long = runCatching {
-        val retriever = MediaMetadataRetriever()
-        try {
-            retriever.setDataSource(file.absolutePath)
-            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLong() ?: 0L
-        } finally {
-            retriever.release()
-        }
-    }.getOrDefault(0L)
 
     /** Observa el resultado de las descargas y lo traduce a [messages]. */
     private fun observeDownloadResults() {
@@ -318,23 +264,22 @@ class SongsViewModel(application: Application) : AndroidViewModel(application) {
                     for (info in infos) {
                         when (info.state) {
                             WorkInfo.State.SUCCEEDED -> {
-                                if (seenDownloadIds.add(info.id)) {
-                                    val output = info.outputData
-                                    if (output.getString(DownloadWorker.KEY_TYPE) == DownloadWorker.TYPE_PLAYLIST) {
-                                        val count = output.getInt(DownloadWorker.KEY_DONE, 0)
-                                        _messages.tryEmit(app.getString(R.string.playlist_downloaded, count))
-                                    } else {
-                                        val title = output.getString(DownloadWorker.KEY_SONG_TITLE)
-                                        _messages.tryEmit(app.getString(R.string.download_added, title.orEmpty()))
-                                    }
+                                // Solo notifica una vez por descarga, incluso entre sesiones.
+                                if (app.playbackPreferences.isDownloadSeen(info.id)) continue
+                                val output = info.outputData
+                                if (output.getString(DownloadWorker.KEY_TYPE) == DownloadWorker.TYPE_PLAYLIST) {
+                                    val count = output.getInt(DownloadWorker.KEY_DONE, 0)
+                                    _messages.tryEmit(app.getString(R.string.playlist_downloaded, count))
+                                } else {
+                                    val title = output.getString(DownloadWorker.KEY_SONG_TITLE)
+                                    _messages.tryEmit(app.getString(R.string.download_added, title.orEmpty()))
                                 }
                             }
                             WorkInfo.State.FAILED -> {
-                                if (seenDownloadIds.add(info.id)) {
-                                    val error = info.outputData.getString(DownloadWorker.KEY_ERROR)
-                                        ?: app.getString(R.string.download_failed, "")
-                                    _messages.tryEmit(app.getString(R.string.download_failed, error))
-                                }
+                                if (app.playbackPreferences.isDownloadSeen(info.id)) continue
+                                val error = info.outputData.getString(DownloadWorker.KEY_ERROR)
+                                    ?: app.getString(R.string.download_failed, "")
+                                _messages.tryEmit(app.getString(R.string.download_failed, error))
                             }
                             else -> Unit
                         }
@@ -366,10 +311,6 @@ class SongsViewModel(application: Application) : AndroidViewModel(application) {
     fun installUpdate() = updateManager.installUpdate()
 
     fun dismissUpdate() = updateManager.dismiss()
-
-    private companion object {
-        const val IMPORT_DIR = "music/imported"
-    }
 }
 
 /** Criterios de ordenación de la biblioteca. */

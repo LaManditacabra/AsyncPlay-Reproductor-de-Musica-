@@ -25,7 +25,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         data object Loading : SearchUiState
         data class Results(val query: String, val results: List<SearchResult>) : SearchUiState
         data class NoResults(val query: String) : SearchUiState
-        data object Error : SearchUiState
+        data class Error(val message: String) : SearchUiState
     }
 
     private val searchEngine = SearchEngine()
@@ -47,7 +47,9 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                             SearchUiState.Results(query, results)
                         }
                     },
-                    onFailure = { SearchUiState.Error },
+                    onFailure = { error ->
+                            SearchUiState.Error(error.message ?: error.javaClass.simpleName)
+                        },
                 )
         }
     }

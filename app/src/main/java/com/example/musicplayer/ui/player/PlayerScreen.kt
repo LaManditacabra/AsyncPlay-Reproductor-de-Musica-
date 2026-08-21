@@ -89,9 +89,10 @@ fun PlayerScreen(
                         ),
                     ),
                 )
+                .padding(horizontal = 24.dp)
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .padding(24.dp),
+                .padding(top = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // Cabecera: cerrar + etiqueta.

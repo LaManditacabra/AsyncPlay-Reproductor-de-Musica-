@@ -26,8 +26,8 @@ android {
         applicationId = "com.example.musicplayer"
         minSdk = 26
         targetSdk = 35
-        versionCode = 6
-        versionName = "1.3.1"
+        versionCode = 7
+        versionName = "1.3.2"
 
         // Configuración del repo de GitHub usado por el sistema de actualizaciones.
         buildConfigField("String", "REPO_OWNER", "\"LaManditacabra\"")
@@ -141,4 +141,8 @@ dependencies {
     // ---------------------------------------------------------------
     implementation(libs.newpipe.extractor)
     implementation(libs.okhttp) // Cliente HTTP de NewPipeExtractor (gzip, cookies, redirects)
+
+    // Glance (widgets con Compose)
+    implementation(libs.glance.appwidget)
+    implementation(libs.glance.material3)
 }

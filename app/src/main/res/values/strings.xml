@@ -22,6 +22,7 @@
     <string name="song_pending">Pendiente de descargar</string>
     <string name="action_redownload">Volver a descargar</string>
     <string name="redownload_no_url">Esta canción no tiene URL de YouTube guardada; bórrala y añádela de nuevo.</string>
+    <string name="widget_description">Controla la reproducción desde la pantalla de inicio</string>
 
     <!-- Diálogo de añadir desde YouTube -->
     <string name="add_song_title">Añadir desde YouTube</string>

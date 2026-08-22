@@ -2,6 +2,7 @@ package com.example.musicplayer.player
 
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -292,6 +293,7 @@ class PlaybackController(context: Context) : Player.Listener {
 
     override fun onIsPlayingChanged(isPlaying: Boolean) {
         _state.update { it.copy(isPlaying = isPlaying) }
+        notifyWidget(appContext)
     }
 
     override fun onPlaybackStateChanged(playbackState: Int) {
@@ -310,6 +312,7 @@ class PlaybackController(context: Context) : Player.Listener {
         val song = currentPlaylist.getOrNull(index)
         _state.update { it.copy(currentSong = song, currentIndex = index) }
         song?.let { preferences.lastSongId = it.id }
+        notifyWidget(appContext)
     }
 
     /** Actualiza el estado cuando cambia el modo aleatorio o de repetición. */
@@ -319,6 +322,23 @@ class PlaybackController(context: Context) : Player.Listener {
 
     override fun onRepeatModeChanged(repeatMode: Int) {
         _state.update { it.copy(repeatMode = repeatMode) }
+    }
+
+    private fun notifyWidget(context: Context) {
+        android.util.Log.d(TAG, "notifyWidget called")
+        val appWidgetManager = android.appwidget.AppWidgetManager.getInstance(context)
+        val thisComponent = ComponentName(context, com.example.musicplayer.ui.widget.PlayerWidgetReceiver::class.java)
+        val ids = appWidgetManager.getAppWidgetIds(thisComponent)
+        android.util.Log.d(TAG, "widget ids: ${ids?.contentToString()}")
+        if (ids != null && ids.isNotEmpty()) {
+            for (widgetId in ids) {
+                val intent = Intent(android.appwidget.AppWidgetManager.ACTION_APPWIDGET_UPDATE).apply {
+                    component = thisComponent
+                    putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                }
+                context.sendBroadcast(intent)
+            }
+        }
     }
 
     private companion object {
